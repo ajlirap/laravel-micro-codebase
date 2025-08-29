@@ -4,9 +4,16 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MetricsController;
+use App\Http\Controllers\UserController;
 
 // Versioned API routes
 Route::prefix('v1')->group(function () {
+    // Users API
+    Route::get('/users', [UserController::class, 'index']);
+    Route::post('/users', [UserController::class, 'store']);
+    Route::get('/users/{id}', [UserController::class, 'show']);
+    Route::put('/users/{id}', [UserController::class, 'update']);
+    Route::delete('/users/{id}', [UserController::class, 'destroy']);
     Route::get('/health', [HealthController::class, 'health']);
     Route::get('/metrics', [MetricsController::class, 'metrics']);
 
@@ -17,6 +24,8 @@ Route::prefix('v1')->group(function () {
     Route::get('/secure/ping', function () {
         return response()->json(['pong' => true]);
     })->middleware('auth.jwt:example.read');
+
+
 
     // Validation error test endpoint
     Route::post('/test/validation', function (Request $request) {

@@ -58,6 +58,9 @@
         "test": [
             "@php artisan config:clear --ansi",
             "@php artisan test"
+        ],
+        "docs:check": [
+            "@php artisan docs:assert-covered"
         ]
     },
     "extra": {
