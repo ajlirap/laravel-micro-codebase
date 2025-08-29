@@ -17,6 +17,16 @@ class MetricsController extends Controller
      *   @OA\Response(response=200, description="OK", @OA\MediaType(mediaType="text/plain"))
      * )
      */
+    /**
+     * @OA\Get(
+     *   path="/api/v1/secure/metrics",
+     *   summary="Prometheus metrics (secured)",
+     *   tags={"metrics"},
+     *   security={{"bearerAuth": {}}},
+     *   @OA\Response(response=200, description="OK", @OA\MediaType(mediaType="text/plain")),
+     *   @OA\Response(response=401, description="Unauthorized")
+     * )
+     */
     public function metrics(CollectorRegistry $registry): Response
     {
         $renderer = new RenderTextFormat();

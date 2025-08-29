@@ -33,6 +33,22 @@ class UserController extends Controller
      *     )
      * )
      */
+    /**
+     * Secure variant: requires Bearer token via bearerAuth scheme.
+     *
+     * @OA\Get(
+     *     path="/api/v1/secure/users",
+     *     tags={"users"},
+     *     summary="List users (secured)",
+     *     security={{"bearerAuth": {}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="OK",
+     *         @OA\JsonContent(type="array", items=@OA\Items(ref="#/components/schemas/User"))
+     *     ),
+     *     @OA\Response(response=401, description="Unauthorized")
+     * )
+     */
     public function index()
     {
         $users = User::query()->orderBy('id')->get();
@@ -55,6 +71,27 @@ class UserController extends Controller
      *         description="Created",
      *         @OA\JsonContent(ref="#/components/schemas/User")
      *     ),
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/Error"))
+     * )
+     */
+    /**
+     * Secure variant: requires Bearer token via bearerAuth scheme.
+     *
+     * @OA\Post(
+     *     path="/api/v1/secure/users",
+     *     tags={"users"},
+     *     summary="Create user (secured)",
+     *     security={{"bearerAuth": {}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(ref="#/components/schemas/UserCreate")
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Created",
+     *         @OA\JsonContent(ref="#/components/schemas/User")
+     *     ),
+     *     @OA\Response(response=401, description="Unauthorized"),
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */
@@ -87,6 +124,20 @@ class UserController extends Controller
      *     @OA\Response(response=404, description="Not Found", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */
+    /**
+     * Secure variant: requires Bearer token via bearerAuth scheme.
+     *
+     * @OA\Get(
+     *     path="/api/v1/secure/users/{id}",
+     *     tags={"users"},
+     *     summary="Get user by ID (secured)",
+     *     security={{"bearerAuth": {}}},
+     *     @OA\Parameter(name="id", in="path", required=true, description="User ID", @OA\Schema(type="integer", format="int64")),
+     *     @OA\Response(response=200, description="OK", @OA\JsonContent(ref="#/components/schemas/User")),
+     *     @OA\Response(response=401, description="Unauthorized"),
+     *     @OA\Response(response=404, description="Not Found", @OA\JsonContent(ref="#/components/schemas/Error"))
+     * )
+     */
     public function show(string $id)
     {
         $user = User::query()->findOrFail((int) $id);
@@ -103,6 +154,22 @@ class UserController extends Controller
      *     @OA\Parameter(name="id", in="path", required=true, description="User ID", @OA\Schema(type="integer", format="int64")),
      *     @OA\RequestBody(required=true, @OA\JsonContent(ref="#/components/schemas/UserUpdate")),
      *     @OA\Response(response=200, description="OK", @OA\JsonContent(ref="#/components/schemas/User")),
+     *     @OA\Response(response=404, description="Not Found", @OA\JsonContent(ref="#/components/schemas/Error")),
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/Error"))
+     * )
+     */
+    /**
+     * Secure variant: requires Bearer token via bearerAuth scheme.
+     *
+     * @OA\Put(
+     *     path="/api/v1/secure/users/{id}",
+     *     tags={"users"},
+     *     summary="Update user (secured)",
+     *     security={{"bearerAuth": {}}},
+     *     @OA\Parameter(name="id", in="path", required=true, description="User ID", @OA\Schema(type="integer", format="int64")),
+     *     @OA\RequestBody(required=true, @OA\JsonContent(ref="#/components/schemas/UserUpdate")),
+     *     @OA\Response(response=200, description="OK", @OA\JsonContent(ref="#/components/schemas/User")),
+     *     @OA\Response(response=401, description="Unauthorized"),
      *     @OA\Response(response=404, description="Not Found", @OA\JsonContent(ref="#/components/schemas/Error")),
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
@@ -140,6 +207,20 @@ class UserController extends Controller
      *     summary="Delete user",
      *     @OA\Parameter(name="id", in="path", required=true, description="User ID", @OA\Schema(type="integer", format="int64")),
      *     @OA\Response(response=204, description="No Content"),
+     *     @OA\Response(response=404, description="Not Found", @OA\JsonContent(ref="#/components/schemas/Error"))
+     * )
+     */
+    /**
+     * Secure variant: requires Bearer token via bearerAuth scheme.
+     *
+     * @OA\Delete(
+     *     path="/api/v1/secure/users/{id}",
+     *     tags={"users"},
+     *     summary="Delete user (secured)",
+     *     security={{"bearerAuth": {}}},
+     *     @OA\Parameter(name="id", in="path", required=true, description="User ID", @OA\Schema(type="integer", format="int64")),
+     *     @OA\Response(response=204, description="No Content"),
+     *     @OA\Response(response=401, description="Unauthorized"),
      *     @OA\Response(response=404, description="Not Found", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */

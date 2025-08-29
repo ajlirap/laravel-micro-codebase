@@ -19,6 +19,15 @@ class HealthController extends Controller
      *   @OA\Response(response=200, description="OK")
      * )
      */
+    /**
+     * @OA\Get(
+     *   path="/api/v1/secure/health",
+     *   summary="Liveness/Readiness (secured)",
+     *   security={{"bearerAuth": {}}},
+     *   @OA\Response(response=200, description="OK"),
+     *   @OA\Response(response=401, description="Unauthorized")
+     * )
+     */
     public function health(): JsonResponse
     {
         Log::debug('Health check starting');

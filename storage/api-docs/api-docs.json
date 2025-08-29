@@ -5,42 +5,58 @@
         "version": "1.0.0"
     },
     "paths": {
-        "/api/v1/health": {
+        "/api/v1/secure/health": {
             "get": {
-                "summary": "Liveness/Readiness",
-                "operationId": "24aa5f3a764fff1c20a2360d0b2ab4cf",
+                "summary": "Liveness/Readiness (secured)",
+                "operationId": "8c943d3292b84a001b11649d546b041d",
                 "responses": {
                     "200": {
                         "description": "OK"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
-        "/api/v1/metrics": {
+        "/api/v1/secure/metrics": {
             "get": {
                 "tags": [
                     "metrics"
                 ],
-                "summary": "Prometheus metrics",
-                "operationId": "bdb809ab7ae4695d0dc047e76313c756",
+                "summary": "Prometheus metrics (secured)",
+                "operationId": "7758dc3f99e4954c526730e13ae1c619",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "content": {
                             "text/plain": {}
                         }
+                    },
+                    "401": {
+                        "description": "Unauthorized"
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
-        "/api/v1/users": {
+        "/api/v1/secure/users": {
             "get": {
                 "tags": [
                     "users"
                 ],
-                "summary": "List users",
-                "description": "Display a listing of the resource.",
-                "operationId": "3ab81e3f9b24b4f36ab08d72349ac632",
+                "summary": "List users (secured)",
+                "description": "Secure variant: requires Bearer token via bearerAuth scheme.",
+                "operationId": "3b039af5989b0b008390d16032778193",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -54,16 +70,24 @@
                                 }
                             }
                         }
+                    },
+                    "401": {
+                        "description": "Unauthorized"
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             },
             "post": {
                 "tags": [
                     "users"
                 ],
-                "summary": "Create user",
-                "description": "Store a newly created resource in storage.",
-                "operationId": "ba548b97148bb5c0d8cab3bc3f128bfd",
+                "summary": "Create user (secured)",
+                "description": "Secure variant: requires Bearer token via bearerAuth scheme.",
+                "operationId": "e3a20219bc3d04bfa309184ad3898d1e",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -85,6 +109,9 @@
                             }
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
                     "422": {
                         "description": "Validation error",
                         "content": {
@@ -95,17 +122,22 @@
                             }
                         }
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
-        "/api/v1/users/{id}": {
+        "/api/v1/secure/users/{id}": {
             "get": {
                 "tags": [
                     "users"
                 ],
-                "summary": "Get user by ID",
-                "description": "Display the specified resource.",
-                "operationId": "daaf7a6169ee9348c3fddb07778598ff",
+                "summary": "Get user by ID (secured)",
+                "description": "Secure variant: requires Bearer token via bearerAuth scheme.",
+                "operationId": "39f36cd73e8e36eb64d413436a5abb5f",
                 "parameters": [
                     {
                         "name": "id",
@@ -129,6 +161,9 @@
                             }
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
                     "404": {
                         "description": "Not Found",
                         "content": {
@@ -139,15 +174,20 @@
                             }
                         }
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             },
             "put": {
                 "tags": [
                     "users"
                 ],
-                "summary": "Update user",
-                "description": "Update the specified resource in storage.",
-                "operationId": "59e98fba99e974815e27979dd58e2175",
+                "summary": "Update user (secured)",
+                "description": "Secure variant: requires Bearer token via bearerAuth scheme.",
+                "operationId": "f9d6539df7bdd8eb261de6b24c70883e",
                 "parameters": [
                     {
                         "name": "id",
@@ -181,6 +221,9 @@
                             }
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
                     "404": {
                         "description": "Not Found",
                         "content": {
@@ -201,15 +244,20 @@
                             }
                         }
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             },
             "delete": {
                 "tags": [
                     "users"
                 ],
-                "summary": "Delete user",
-                "description": "Remove the specified resource from storage.",
-                "operationId": "c30c64b8b7730b65c7714c9af4a6f5fa",
+                "summary": "Delete user (secured)",
+                "description": "Secure variant: requires Bearer token via bearerAuth scheme.",
+                "operationId": "80ebdc1a642f10ac981e0975c12ab32c",
                 "parameters": [
                     {
                         "name": "id",
@@ -226,6 +274,9 @@
                     "204": {
                         "description": "No Content"
                     },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
                     "404": {
                         "description": "Not Found",
                         "content": {
@@ -236,7 +287,12 @@
                             }
                         }
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         }
     },
@@ -334,6 +390,14 @@
                     }
                 },
                 "type": "object"
+            }
+        },
+        "securitySchemes": {
+            "bearerAuth": {
+                "type": "http",
+                "description": "JWT Bearer token. Example: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+                "bearerFormat": "JWT",
+                "scheme": "bearer"
             }
         }
     },
