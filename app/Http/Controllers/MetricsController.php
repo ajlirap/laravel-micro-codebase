@@ -16,8 +16,6 @@ class MetricsController extends Controller
      *   tags={"metrics"},
      *   @OA\Response(response=200, description="OK", @OA\MediaType(mediaType="text/plain"))
      * )
-     */
-    /**
      * @OA\Get(
      *   path="/api/v1/secure/metrics",
      *   summary="Prometheus metrics (secured)",

@@ -5,6 +5,187 @@
         "version": "1.0.0"
     },
     "paths": {
+        "/api/v1/widgets/{id}": {
+            "get": {
+                "tags": [
+                    "samples"
+                ],
+                "summary": "Get widget (sample, unsecured)",
+                "description": "Unsecured widgets sample",
+                "operationId": "56a850c619a8167d2dae249fe039d84e",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "id": {
+                                            "type": "string"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/secure/widgets/{id}": {
+            "get": {
+                "tags": [
+                    "samples"
+                ],
+                "summary": "Get widget (sample, secured)",
+                "description": "Secured widgets sample",
+                "operationId": "3bd5fba33ea6957cb53c3c75e914b881",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "id": {
+                                            "type": "string"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/test/validation": {
+            "post": {
+                "tags": [
+                    "samples"
+                ],
+                "summary": "Validation example (unsecured)",
+                "description": "Unsecured validation sample",
+                "operationId": "07078933c62a40cba5e897b26a812660",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                }
+            }
+        },
+        "/api/v1/secure/test/validation": {
+            "post": {
+                "tags": [
+                    "samples"
+                ],
+                "summary": "Validation example (secured)",
+                "description": "Secured validation sample",
+                "operationId": "d97468c909134e751017cc5ff55520cf",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/health": {
+            "get": {
+                "summary": "Liveness/Readiness",
+                "operationId": "24aa5f3a764fff1c20a2360d0b2ab4cf",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
         "/api/v1/secure/health": {
             "get": {
                 "summary": "Liveness/Readiness (secured)",
@@ -22,6 +203,23 @@
                         "bearerAuth": []
                     }
                 ]
+            }
+        },
+        "/api/v1/metrics": {
+            "get": {
+                "tags": [
+                    "metrics"
+                ],
+                "summary": "Prometheus metrics",
+                "operationId": "bdb809ab7ae4695d0dc047e76313c756",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "text/plain": {}
+                        }
+                    }
+                }
             }
         },
         "/api/v1/secure/metrics": {
@@ -49,13 +247,77 @@
                 ]
             }
         },
+        "/api/v1/users": {
+            "get": {
+                "tags": [
+                    "users"
+                ],
+                "summary": "List users",
+                "description": "Display a listing of the resource.",
+                "operationId": "3ab81e3f9b24b4f36ab08d72349ac632",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/User"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "users"
+                ],
+                "summary": "Create user",
+                "description": "Store a newly created resource in storage.",
+                "operationId": "ba548b97148bb5c0d8cab3bc3f128bfd",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UserCreate"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/User"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/secure/users": {
             "get": {
                 "tags": [
                     "users"
                 ],
                 "summary": "List users (secured)",
-                "description": "Secure variant: requires Bearer token via bearerAuth scheme.",
                 "operationId": "3b039af5989b0b008390d16032778193",
                 "responses": {
                     "200": {
@@ -86,7 +348,6 @@
                     "users"
                 ],
                 "summary": "Create user (secured)",
-                "description": "Secure variant: requires Bearer token via bearerAuth scheme.",
                 "operationId": "e3a20219bc3d04bfa309184ad3898d1e",
                 "requestBody": {
                     "required": true,
@@ -130,13 +391,153 @@
                 ]
             }
         },
+        "/api/v1/users/{id}": {
+            "get": {
+                "tags": [
+                    "users"
+                ],
+                "summary": "Get user by ID",
+                "description": "Display the specified resource.",
+                "operationId": "daaf7a6169ee9348c3fddb07778598ff",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "User ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int64"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/User"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "users"
+                ],
+                "summary": "Update user",
+                "description": "Update the specified resource in storage.",
+                "operationId": "59e98fba99e974815e27979dd58e2175",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "User ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int64"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UserUpdate"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/User"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "users"
+                ],
+                "summary": "Delete user",
+                "description": "Remove the specified resource from storage.",
+                "operationId": "c30c64b8b7730b65c7714c9af4a6f5fa",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "User ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int64"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/secure/users/{id}": {
             "get": {
                 "tags": [
                     "users"
                 ],
                 "summary": "Get user by ID (secured)",
-                "description": "Secure variant: requires Bearer token via bearerAuth scheme.",
                 "operationId": "39f36cd73e8e36eb64d413436a5abb5f",
                 "parameters": [
                     {
@@ -186,7 +587,6 @@
                     "users"
                 ],
                 "summary": "Update user (secured)",
-                "description": "Secure variant: requires Bearer token via bearerAuth scheme.",
                 "operationId": "f9d6539df7bdd8eb261de6b24c70883e",
                 "parameters": [
                     {
@@ -256,7 +656,6 @@
                     "users"
                 ],
                 "summary": "Delete user (secured)",
-                "description": "Secure variant: requires Bearer token via bearerAuth scheme.",
                 "operationId": "80ebdc1a642f10ac981e0975c12ab32c",
                 "parameters": [
                     {
@@ -402,6 +801,10 @@
         }
     },
     "tags": [
+        {
+            "name": "samples",
+            "description": "samples"
+        },
         {
             "name": "metrics",
             "description": "metrics"

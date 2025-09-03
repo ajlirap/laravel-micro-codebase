@@ -18,8 +18,6 @@ class HealthController extends Controller
      *   summary="Liveness/Readiness",
      *   @OA\Response(response=200, description="OK")
      * )
-     */
-    /**
      * @OA\Get(
      *   path="/api/v1/secure/health",
      *   summary="Liveness/Readiness (secured)",

@@ -32,10 +32,6 @@ class UserController extends Controller
      *         @OA\JsonContent(type="array", items=@OA\Items(ref="#/components/schemas/User"))
      *     )
      * )
-     */
-    /**
-     * Secure variant: requires Bearer token via bearerAuth scheme.
-     *
      * @OA\Get(
      *     path="/api/v1/secure/users",
      *     tags={"users"},
@@ -73,10 +69,6 @@ class UserController extends Controller
      *     ),
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
-     */
-    /**
-     * Secure variant: requires Bearer token via bearerAuth scheme.
-     *
      * @OA\Post(
      *     path="/api/v1/secure/users",
      *     tags={"users"},
@@ -123,10 +115,6 @@ class UserController extends Controller
      *     @OA\Response(response=200, description="OK", @OA\JsonContent(ref="#/components/schemas/User")),
      *     @OA\Response(response=404, description="Not Found", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
-     */
-    /**
-     * Secure variant: requires Bearer token via bearerAuth scheme.
-     *
      * @OA\Get(
      *     path="/api/v1/secure/users/{id}",
      *     tags={"users"},
@@ -157,10 +145,6 @@ class UserController extends Controller
      *     @OA\Response(response=404, description="Not Found", @OA\JsonContent(ref="#/components/schemas/Error")),
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
-     */
-    /**
-     * Secure variant: requires Bearer token via bearerAuth scheme.
-     *
      * @OA\Put(
      *     path="/api/v1/secure/users/{id}",
      *     tags={"users"},
@@ -209,10 +193,6 @@ class UserController extends Controller
      *     @OA\Response(response=204, description="No Content"),
      *     @OA\Response(response=404, description="Not Found", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
-     */
-    /**
-     * Secure variant: requires Bearer token via bearerAuth scheme.
-     *
      * @OA\Delete(
      *     path="/api/v1/secure/users/{id}",
      *     tags={"users"},
