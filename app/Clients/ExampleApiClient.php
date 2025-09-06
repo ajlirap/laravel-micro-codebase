@@ -3,7 +3,6 @@
 namespace App\Clients;
 
 use App\Support\Http\ResilientHttpClient;
-use Illuminate\Http\Client\Response;
 
 class ExampleApiClient
 {
@@ -30,4 +29,3 @@ class ExampleApiClient
         return $response->json();
     }
 }
-
