@@ -17,6 +17,15 @@ class JwtAuthenticate
     {
         $auth = $request->bearerToken();
         if (!$auth) {
+            try {
+                logger()->warning('JWT auth missing bearer token', [
+                    'path' => $request->path(),
+                    'method' => $request->method(),
+                    'ip' => $request->ip(),
+                    'auth_header_present' => $request->headers->has('Authorization'),
+                    // Do NOT log full header/token for security; headers can still confirm presence/casing issues
+                ]);
+            } catch (\Throwable) {}
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
@@ -34,16 +43,39 @@ class JwtAuthenticate
 
             // Enforce allowed algorithms from config
             $alg = $header['alg'] ?? null;
+            try { logger()->debug('JWT header parsed', [ 'alg' => $alg, 'kid' => $kid, 'accepted_algs' => $accepted ]); } catch (\Throwable) {}
             if ($alg && !in_array($alg, (array) $accepted, true)) {
+                try { logger()->warning('JWT algorithm not accepted', [ 'alg' => $alg, 'accepted_algs' => $accepted ]); } catch (\Throwable) {}
                 throw new \RuntimeException('Algorithm not accepted');
             }
 
             $keys = $this->jwks->getKeys();
             $jwks = JWK::parseKeySet(['keys' => $keys]);
+            try { logger()->debug('JWKS loaded', [ 'keys_count' => count($keys), 'kids' => array_values(array_filter(array_map(static fn($k) => $k['kid'] ?? null, $keys))) ]); } catch (\Throwable) {}
 
-            $decoded = JWT::decode($token, $jwks);
+            try {
+                $decoded = JWT::decode($token, $jwks);
+            } catch (\Throwable $e) {
+                try { logger()->warning('JWT signature/claims decode failed', [ 'error' => $e->getMessage(), 'alg' => $alg, 'kid' => $kid ]); } catch (\Throwable) {}
+                throw $e;
+            }
 
             $claims = (array) $decoded;
+            try {
+                // Log core claims (avoid full token dump)
+                $audLog = isset($claims['aud']) ? (is_array($claims['aud']) ? $claims['aud'] : [(string) $claims['aud']]) : [];
+                logger()->debug('JWT decoded claims (summary)', [
+                    'iss' => $claims['iss'] ?? null,
+                    'sub' => $claims['sub'] ?? null,
+                    'aud' => $audLog,
+                    'exp' => $claims['exp'] ?? null,
+                    'nbf' => $claims['nbf'] ?? null,
+                    'iat' => $claims['iat'] ?? null,
+                    'scp' => $claims['scp'] ?? null,
+                    'scope' => $claims['scope'] ?? null,
+                    'roles' => $claims['roles'] ?? null,
+                ]);
+            } catch (\Throwable) {}
             // Expected issuers: support comma-separated list and tolerate trailing slash differences (AAD B2C)
             $issList = array_filter(array_map('trim', explode(',', $issCfg)));
             if (!empty($issList)) {
@@ -56,7 +88,10 @@ class JwtAuthenticate
                         $ok = true; break;
                     }
                 }
-                if (!$ok) throw new \RuntimeException('Issuer mismatch');
+                if (!$ok) {
+                    try { logger()->warning('JWT issuer mismatch', [ 'claim_iss' => $claimIss, 'expected_iss' => $issList ]); } catch (\Throwable) {}
+                    throw new \RuntimeException('Issuer mismatch');
+                }
             }
 
             // Expected audiences: support comma-separated list and both string/array claim forms
@@ -68,7 +103,10 @@ class JwtAuthenticate
                 foreach ($audList as $expectedAud) {
                     if (in_array($expectedAud, $claimAud, true)) { $ok = true; break; }
                 }
-                if (!$ok) throw new \RuntimeException('Audience mismatch');
+                if (!$ok) {
+                    try { logger()->warning('JWT audience mismatch', [ 'claim_aud' => $claimAud, 'expected_aud' => $audList ]); } catch (\Throwable) {}
+                    throw new \RuntimeException('Audience mismatch');
+                }
             }
 
             // Scope/role check
@@ -100,6 +138,7 @@ class JwtAuthenticate
 
                 foreach ($requiredScopes as $required) {
                     if (!in_array($required, $tokenScopes, true)) {
+                        try { logger()->warning('JWT missing required scope', [ 'required' => $required, 'token_scopes' => $tokenScopes ]); } catch (\Throwable) {}
                         return response()->json(['message' => 'Forbidden'], 403);
                     }
                 }
@@ -109,7 +148,9 @@ class JwtAuthenticate
             app()->instance('jwt_claims', $claims);
         } catch (\Throwable $e) {
             // Avoid leaking details to clients; log for server diagnostics.
-            try { logger()->warning('JWT auth failed: '.$e->getMessage()); } catch (\Throwable) {}
+            try {
+                logger()->warning('JWT auth failed', [ 'error' => $e->getMessage(), 'path' => $request->path(), 'method' => $request->method() ]);
+            } catch (\Throwable) {}
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
