@@ -7,6 +7,9 @@ use Closure;
 use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
+use Firebase\JWT\ExpiredException;
+use Firebase\JWT\BeforeValidException;
+use Firebase\JWT\SignatureInvalidException;
 use Illuminate\Http\Request;
 
 class JwtAuthenticate
@@ -35,11 +38,15 @@ class JwtAuthenticate
             if (count($parts) < 2) throw new \RuntimeException('Invalid token');
             $header = json_decode(JWT::urlsafeB64Decode($parts[0]), true);
             $kid = $header['kid'] ?? null;
+            $claimsUnverified = [];
+            try { $claimsUnverified = json_decode(JWT::urlsafeB64Decode($parts[1] ?? ''), true) ?: []; } catch (\Throwable) {}
 
             // Config
             $accepted = config('micro.security.jwt.accepted_algs', ['RS256']);
             $issCfg = (string) config('micro.security.jwt.expected_iss');
             $audCfg = (string) config('micro.security.jwt.expected_aud');
+            $leeway = (int) config('micro.security.jwt.leeway_seconds', 0);
+            if ($leeway > 0) { JWT::$leeway = $leeway; }
 
             // Enforce allowed algorithms from config
             $alg = $header['alg'] ?? null;
@@ -76,6 +83,10 @@ class JwtAuthenticate
                 ]);
             } catch (\Throwable) {}
 
+            // Track auth error context for client header
+            $errorReason = 'invalid_token';
+            $errorDescription = 'JWT validation failed';
+
             try {
                 $decoded = JWT::decode($token, $jwks);
             } catch (\Throwable $e) {
@@ -98,13 +109,70 @@ class JwtAuthenticate
                             $decoded = JWT::decode($token, $singleKey);
                         } catch (\Throwable $inner) {
                             try { logger()->warning('JWT fallback decode failed', [ 'error' => $inner->getMessage(), 'kid' => $kid ]); } catch (\Throwable) {}
+                            // classify error before rethrow
+                            if ($inner instanceof ExpiredException) {
+                                $errorReason = 'invalid_token';
+                                $errorDescription = 'The access token expired';
+                            } elseif ($inner instanceof BeforeValidException) {
+                                $errorReason = 'invalid_token';
+                                $errorDescription = 'The access token is not yet valid';
+                            } elseif ($inner instanceof SignatureInvalidException) {
+                                $errorReason = 'invalid_token';
+                                $errorDescription = 'Signature verification failed';
+                            }
                             throw $e; // rethrow original
                         }
                     } else {
+                        // classify error before rethrow
+                        if ($e instanceof ExpiredException) {
+                            $errorReason = 'invalid_token';
+                            $errorDescription = 'The access token expired';
+                        } elseif ($e instanceof BeforeValidException) {
+                            $errorReason = 'invalid_token';
+                            $errorDescription = 'The access token is not yet valid';
+                        } elseif ($e instanceof SignatureInvalidException) {
+                            $errorReason = 'invalid_token';
+                            $errorDescription = 'Signature verification failed';
+                        }
                         throw $e;
                     }
                 } else {
-                    try { logger()->warning('JWT signature/claims decode failed', [ 'error' => $e->getMessage(), 'alg' => $alg, 'kid' => $kid, 'fallback_tried' => $fallbackTried ]); } catch (\Throwable) {}
+                    // classify and log details
+                    $nowTs = time();
+                    $exp = isset($claimsUnverified['exp']) ? (int) $claimsUnverified['exp'] : null;
+                    $nbf = isset($claimsUnverified['nbf']) ? (int) $claimsUnverified['nbf'] : null;
+                    $iat = isset($claimsUnverified['iat']) ? (int) $claimsUnverified['iat'] : null;
+                    if ($e instanceof ExpiredException) {
+                        $errorReason = 'invalid_token';
+                        $errorDescription = 'The access token expired';
+                    } elseif ($e instanceof BeforeValidException) {
+                        $errorReason = 'invalid_token';
+                        $errorDescription = 'The access token is not yet valid';
+                    } elseif ($e instanceof SignatureInvalidException) {
+                        $errorReason = 'invalid_token';
+                        $errorDescription = 'Signature verification failed';
+                    }
+                    try {
+                        logger()->warning('JWT signature/claims decode failed', [
+                            'error' => $e->getMessage(),
+                            'exception' => get_class($e),
+                            'alg' => $alg,
+                            'kid' => $kid,
+                            'fallback_tried' => $fallbackTried,
+                            'now' => $nowTs,
+                            'leeway' => $leeway,
+                            'claims_exp' => $exp,
+                            'claims_nbf' => $nbf,
+                            'claims_iat' => $iat,
+                            'claims_iss' => $claimsUnverified['iss'] ?? null,
+                            'claims_aud' => $claimsUnverified['aud'] ?? null,
+                        ]);
+                    } catch (\Throwable) {}
+                    // Attach error context for outer catch via container
+                    app()->instance('jwt_last_error_context', [
+                        'error_reason' => $errorReason,
+                        'error_description' => $errorDescription,
+                    ]);
                     throw $e;
                 }
             }
@@ -200,7 +268,18 @@ class JwtAuthenticate
             try {
                 logger()->warning('JWT auth failed', [ 'error' => $e->getMessage(), 'path' => $request->path(), 'method' => $request->method() ]);
             } catch (\Throwable) {}
-            return response()->json(['message' => 'Unauthorized'], 401);
+            // RFC 6750: include WWW-Authenticate header with reason
+            $ctx = app()->bound('jwt_last_error_context') ? app('jwt_last_error_context') : [];
+            $reason = is_array($ctx) && isset($ctx['error_reason']) ? (string) $ctx['error_reason'] : 'invalid_token';
+            $desc = is_array($ctx) && isset($ctx['error_description']) ? (string) $ctx['error_description'] : 'JWT validation failed';
+            $www = 'Bearer realm="api", error="'.$reason.'", error_description="'.str_replace('"', '\"', $desc).'"';
+
+            $body = ['message' => 'Unauthorized'];
+            if (config('app.debug')) {
+                $body['reason'] = $desc;
+                $body['error'] = $e->getMessage();
+            }
+            return response()->json($body, 401)->withHeaders(['WWW-Authenticate' => $www]);
         }
 
         return $next($request);

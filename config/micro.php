@@ -51,6 +51,8 @@ return [
             'expected_iss' => env('AUTH_EXPECTED_ISS'),
             'expected_aud' => env('AUTH_EXPECTED_AUD'),
             'accepted_algs' => array_filter(array_map('trim', explode(',', env('AUTH_ACCEPTED_ALGS', 'RS256')))),
+            // Acceptable clock skew (in seconds) for exp/nbf/iat validation
+            'leeway_seconds' => env('AUTH_LEEWAY_SECONDS', 0),
             'cache_ttl_seconds' => env('AUTH_CACHE_TTL_SECONDS', 3600),
         ],
         'field_encryption' => [
@@ -88,4 +90,3 @@ return [
         ],
     ],
 ];
-
