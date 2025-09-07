@@ -46,6 +46,7 @@ class JwtAuthenticate
             $issCfg = (string) config('micro.security.jwt.expected_iss');
             $audCfg = (string) config('micro.security.jwt.expected_aud');
             $leeway = (int) config('micro.security.jwt.leeway_seconds', 0);
+            $preferExp = (bool) config('micro.security.jwt.prefer_exp_reason_on_failure', false);
             if ($leeway > 0) { JWT::$leeway = $leeway; }
 
             // Enforce allowed algorithms from config
@@ -109,7 +110,7 @@ class JwtAuthenticate
                             $decoded = JWT::decode($token, $singleKey);
                         } catch (\Throwable $inner) {
                             try { logger()->warning('JWT fallback decode failed', [ 'error' => $inner->getMessage(), 'kid' => $kid ]); } catch (\Throwable) {}
-                            // classify error before rethrow
+                            // classify error and attach context before rethrow
                             if ($inner instanceof ExpiredException) {
                                 $errorReason = 'invalid_token';
                                 $errorDescription = 'The access token expired';
@@ -120,10 +121,21 @@ class JwtAuthenticate
                                 $errorReason = 'invalid_token';
                                 $errorDescription = 'Signature verification failed';
                             }
+                            // Prefer expired hint based on unverified claims if enabled
+                            $nowTs = time();
+                            $exp = isset($claimsUnverified['exp']) ? (int) $claimsUnverified['exp'] : null;
+                            if ($preferExp && is_int($exp) && ($exp + $leeway) <= $nowTs) {
+                                $errorReason = 'invalid_token';
+                                $errorDescription = 'The access token expired';
+                            }
+                            app()->instance('jwt_last_error_context', [
+                                'error_reason' => $errorReason,
+                                'error_description' => $errorDescription,
+                            ]);
                             throw $e; // rethrow original
                         }
                     } else {
-                        // classify error before rethrow
+                        // classify error and attach context before rethrow
                         if ($e instanceof ExpiredException) {
                             $errorReason = 'invalid_token';
                             $errorDescription = 'The access token expired';
@@ -134,6 +146,16 @@ class JwtAuthenticate
                             $errorReason = 'invalid_token';
                             $errorDescription = 'Signature verification failed';
                         }
+                        $nowTs = time();
+                        $exp = isset($claimsUnverified['exp']) ? (int) $claimsUnverified['exp'] : null;
+                        if ($preferExp && is_int($exp) && ($exp + $leeway) <= $nowTs) {
+                            $errorReason = 'invalid_token';
+                            $errorDescription = 'The access token expired';
+                        }
+                        app()->instance('jwt_last_error_context', [
+                            'error_reason' => $errorReason,
+                            'error_description' => $errorDescription,
+                        ]);
                         throw $e;
                     }
                 } else {
@@ -151,6 +173,10 @@ class JwtAuthenticate
                     } elseif ($e instanceof SignatureInvalidException) {
                         $errorReason = 'invalid_token';
                         $errorDescription = 'Signature verification failed';
+                    }
+                    if ($preferExp && is_int($exp) && ($exp + $leeway) <= $nowTs) {
+                        $errorReason = 'invalid_token';
+                        $errorDescription = 'The access token expired';
                     }
                     try {
                         logger()->warning('JWT signature/claims decode failed', [

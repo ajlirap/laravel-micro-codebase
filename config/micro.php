@@ -53,6 +53,9 @@ return [
             'accepted_algs' => array_filter(array_map('trim', explode(',', env('AUTH_ACCEPTED_ALGS', 'RS256')))),
             // Acceptable clock skew (in seconds) for exp/nbf/iat validation
             'leeway_seconds' => env('AUTH_LEEWAY_SECONDS', 0),
+            // Prefer reporting "expired" based on unverified exp claim when signature fails
+            // Useful in dev to surface that a token is old even if the key is wrong.
+            'prefer_exp_reason_on_failure' => env('AUTH_PREFER_EXP_REASON', false),
             'cache_ttl_seconds' => env('AUTH_CACHE_TTL_SECONDS', 3600),
         ],
         'field_encryption' => [
