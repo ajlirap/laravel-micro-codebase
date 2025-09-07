@@ -64,9 +64,9 @@ class JwtAuthenticate
                 return $k;
             }, $keys);
 
-            // Provide default algorithm if JWKS items omit "alg"
+            // Provide default algorithm if JWKS items omit "alg". Prefer token header alg when available.
             $algList = (array) $accepted;
-            $defaultAlg = $algList[0] ?? 'RS256';
+            $defaultAlg = $alg ?: ($algList[0] ?? 'RS256');
             $jwks = JWK::parseKeySet(['keys' => $keys], $defaultAlg);
             try {
                 logger()->debug('JWKS loaded', [
@@ -94,7 +94,7 @@ class JwtAuthenticate
                     }
                     if ($match) {
                         try {
-                            $singleKey = JWK::parseKey($match, $defaultAlg);
+                            $singleKey = JWK::parseKey($match, $alg ?: $defaultAlg);
                             $decoded = JWT::decode($token, $singleKey);
                         } catch (\Throwable $inner) {
                             try { logger()->warning('JWT fallback decode failed', [ 'error' => $inner->getMessage(), 'kid' => $kid ]); } catch (\Throwable) {}
