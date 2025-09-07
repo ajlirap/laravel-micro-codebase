@@ -50,14 +50,63 @@ class JwtAuthenticate
             }
 
             $keys = $this->jwks->getKeys();
-            $jwks = JWK::parseKeySet(['keys' => $keys]);
-            try { logger()->debug('JWKS loaded', [ 'keys_count' => count($keys), 'kids' => array_values(array_filter(array_map(static fn($k) => $k['kid'] ?? null, $keys))) ]); } catch (\Throwable) {}
+            if (empty($keys)) {
+                try { logger()->warning('JWKS empty or not fetched'); } catch (\Throwable) {}
+                throw new \RuntimeException('No JWKS keys available');
+            }
+
+            // Ensure each JWK has a usable "kid"; fall back to x5t/x5t#S256 when missing.
+            $keys = array_map(static function ($k) {
+                if (is_array($k) && !isset($k['kid'])) {
+                    if (isset($k['x5t'])) { $k['kid'] = (string) $k['x5t']; }
+                    elseif (isset($k['x5t#S256'])) { $k['kid'] = (string) $k['x5t#S256']; }
+                }
+                return $k;
+            }, $keys);
+
+            // Provide default algorithm if JWKS items omit "alg"
+            $algList = (array) $accepted;
+            $defaultAlg = $algList[0] ?? 'RS256';
+            $jwks = JWK::parseKeySet(['keys' => $keys], $defaultAlg);
+            try {
+                logger()->debug('JWKS loaded', [
+                    'keys_count' => count($keys),
+                    'kids' => array_values(array_filter(array_map(static fn($k) => is_array($k) ? ($k['kid'] ?? null) : null, $keys))),
+                    'default_alg' => $defaultAlg,
+                ]);
+            } catch (\Throwable) {}
 
             try {
                 $decoded = JWT::decode($token, $jwks);
             } catch (\Throwable $e) {
-                try { logger()->warning('JWT signature/claims decode failed', [ 'error' => $e->getMessage(), 'alg' => $alg, 'kid' => $kid ]); } catch (\Throwable) {}
-                throw $e;
+                // If failure might be due to kid mismatch (e.g., token kid equals x5t), try a targeted fallback
+                $fallbackTried = false;
+                if ($kid && !isset($jwks[$kid])) {
+                    $fallbackTried = true;
+                    try { logger()->debug('Attempting kid fallback lookup', [ 'kid' => $kid ]); } catch (\Throwable) {}
+                    $match = null;
+                    foreach ($keys as $k) {
+                        if (!is_array($k)) { continue; }
+                        $cands = [];
+                        foreach (['kid','x5t','x5t#S256'] as $f) { if (isset($k[$f])) { $cands[] = (string) $k[$f]; } }
+                        $lower = array_map('strtolower', $cands);
+                        if (in_array($kid, $cands, true) || in_array(strtolower($kid), $lower, true)) { $match = $k; break; }
+                    }
+                    if ($match) {
+                        try {
+                            $singleKey = JWK::parseKey($match, $defaultAlg);
+                            $decoded = JWT::decode($token, $singleKey);
+                        } catch (\Throwable $inner) {
+                            try { logger()->warning('JWT fallback decode failed', [ 'error' => $inner->getMessage(), 'kid' => $kid ]); } catch (\Throwable) {}
+                            throw $e; // rethrow original
+                        }
+                    } else {
+                        throw $e;
+                    }
+                } else {
+                    try { logger()->warning('JWT signature/claims decode failed', [ 'error' => $e->getMessage(), 'alg' => $alg, 'kid' => $kid, 'fallback_tried' => $fallbackTried ]); } catch (\Throwable) {}
+                    throw $e;
+                }
             }
 
             $claims = (array) $decoded;
