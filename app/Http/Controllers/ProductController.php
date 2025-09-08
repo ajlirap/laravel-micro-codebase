@@ -69,9 +69,7 @@ use App\Repositories\Contracts\ProductRepositoryInterface;
  */
 class ProductController extends Controller
 {
-    public function __construct(private ProductRepositoryInterface $products)
-    {
-    }
+    public function __construct(private ProductRepositoryInterface $products) {}
 
     public function index(Request $request)
     {

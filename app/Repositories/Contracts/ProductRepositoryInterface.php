@@ -13,4 +13,3 @@ interface ProductRepositoryInterface
 
     public function getAll(int $limit = 50): Collection;
 }
-
