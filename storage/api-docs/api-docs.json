@@ -247,6 +247,94 @@
                 ]
             }
         },
+        "/api/v1/products/{sku}": {
+            "get": {
+                "tags": [
+                    "Products"
+                ],
+                "summary": "Get a product by SKU",
+                "operationId": "getProductBySku",
+                "parameters": [
+                    {
+                        "name": "sku",
+                        "in": "path",
+                        "description": "The product SKU",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Product found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Product"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Product not found"
+                    }
+                }
+            }
+        },
+        "/api/v1/products": {
+            "post": {
+                "tags": [
+                    "Products"
+                ],
+                "summary": "Create a product",
+                "operationId": "createProduct",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "sku",
+                                    "name"
+                                ],
+                                "properties": {
+                                    "sku": {
+                                        "type": "string",
+                                        "example": "SKU-001"
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "example": "Sample Product"
+                                    },
+                                    "price": {
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 19.99
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Product created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Product"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                }
+            }
+        },
         "/api/v1/users": {
             "get": {
                 "tags": [
@@ -697,6 +785,32 @@
     },
     "components": {
         "schemas": {
+            "Product": {
+                "required": [
+                    "sku",
+                    "name"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "sku": {
+                        "type": "string",
+                        "example": "SKU-001"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Sample Product"
+                    },
+                    "price": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 19.99
+                    }
+                },
+                "type": "object"
+            },
             "User": {
                 "required": [
                     "id",
@@ -801,6 +915,10 @@
         }
     },
     "tags": [
+        {
+            "name": "Products",
+            "description": "Operations related to products"
+        },
         {
             "name": "samples",
             "description": "samples"

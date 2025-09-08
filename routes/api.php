@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MetricsController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\ProductController;
 
 // Versioned API routes
 Route::prefix('v1')->group(function () {
@@ -16,6 +17,10 @@ Route::prefix('v1')->group(function () {
     Route::delete('/users/{id}', [UserController::class, 'destroy']);
     Route::get('/health', [HealthController::class, 'health']);
     Route::get('/metrics', [MetricsController::class, 'metrics']);
+
+    // Products API (example using repository + Swagger annotations)
+    Route::get('/products/{sku}', [ProductController::class, 'show']);
+    Route::post('/products', [ProductController::class, 'store']);
 
     Route::get('/widgets/{id}', function (string $id) {
         return response()->json(['id' => $id, 'name' => 'example']);
