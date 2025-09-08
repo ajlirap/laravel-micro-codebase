@@ -1,212 +1,418 @@
 Laravel 12 Microservice API Template
 
 Overview
-- Opinionated Laravel 12 skeleton for microservices: security, observability, messaging, and resilient HTTP.
-- Focus: fast bootstrap, consistent security, robust observability, RabbitMQ + HTTP comms, production-ready Docker.
-
-> [!TIP]
-> This template shows each API endpoint in two flavors: unsecured and secured (JWT Bearer). Use them side‑by‑side to learn how to apply authentication quickly and consistently.
+- Purpose: Practical starter for secure, observable, message‑driven APIs.
+- Highlights: JWT auth (resource server), resilient outbound HTTP, RabbitMQ, metrics/health, feature flags, and Swagger docs.
 
 Quick Start
-- Requirements: Docker or local PHP 8.3+, Composer, ext-sockets enabled (for RabbitMQ), Redis optional.
-- Install: `composer install` then copy `.env` from `.env.example` and update values.
-- Run locally with Docker: `docker-compose up --build -d` and visit `http://localhost:8080`.
-- Health: `GET http://localhost:8080/api/v1/health`
-- Metrics: `GET http://localhost:8080/api/v1/metrics`
-- Swagger UI: `GET http://localhost:8080/api/documentation` or `/api/docs` redirect.
+- Requirements: PHP 8.3+, Composer, ext-sockets (for RabbitMQ), Docker optional.
+- Install: `composer install` then copy `.env` from `.env.example` and fill values.
+- Run: `php artisan serve` (or `docker-compose up -d`), open `http://localhost:8000` (or `:8080` via Docker).
+- Try endpoints: `GET /api/v1/health`, `GET /api/v1/metrics`, `GET /api/v1/users`.
+- Swagger UI: `GET /api/documentation` (or `/api/docs` redirect).
 
-> [!NOTE]
-> For secured endpoints (under `/api/v1/secure/...`) you must configure JWT settings in `.env` and provide an Authorization header: `Authorization: Bearer <token>`.
+Why These Features
+- Security: Protect write/read endpoints with industry‑standard JWT (Bearer) via JWKS; easy to connect to providers like Azure AD.
+- Resilience: Outbound HTTP gets timeouts, retries, jitter, circuit breaker, OAuth2, and mTLS so downstream hiccups don’t break you.
+- Observability: Health and Prometheus metrics expose service health; correlation IDs tie logs/requests together.
+- Messaging: RabbitMQ integration enables async workflows and decoupling.
+- Progressive Delivery: Feature flags let you ship safely (toggle behavior without redeploys).
 
-Folder Structure Highlights
-- Controllers, Services, Repositories: `app/Http/Controllers`, `app/Repositories`
-- Resilient HTTP module: `app/Support/Http/*` and typed client example `app/Clients/ExampleApiClient.php`
-- Messaging (RabbitMQ): queue connection in `config/queue.php`, example job `app/Jobs/ExampleEventConsumer.php`, publisher `app/Messaging/Publisher.php`
-- Security: JWT middleware `app/Http/Middleware/JwtAuthenticate.php`, field encryption `app/Security/FieldEncryption.php`
-- Tracing/Logging: Correlation middleware `app/Http/Middleware/CorrelationId.php`, JSON logs via `app/Logging/*` and `config/logging.php`
-- Observability: Health/Metrics controllers, Prometheus registry binding in `AppServiceProvider`
-- Feature Flags: `app/FeatureFlags/*` with array driver; stubs for others
+How To Read This File
+- Each capability explains the “why”, config options, and copy‑paste tests.
+- If new to these concepts, follow the examples as checklists.
 
-> [!IMPORTANT]
-> OpenAPI (Swagger) annotations are co‑located with controllers for easy discovery. A reusable `bearerAuth` scheme is defined at `app/Http/Controllers/Docs/Security.php`.
+**JWT Authentication**
+- Why: Verify who calls your API. The middleware validates signature and claims of `Authorization: Bearer <token>`.
+- Routes: Unsecured under `/api/v1/*`; secured duplicates under `/api/v1/secure/*` enforced by `auth.jwt`.
+- Files:
+  - `app/Http/Middleware/JwtAuthenticate.php`: Verifies JWT via JWKS, checks `iss`/`aud` and optional scopes.
+  - `config/micro.php:49`: Settings under `security.jwt`.
+- Env Options:
+  - `AUTH_JWKS_URL`: URL of JWKS (public keys). Example Azure AD v2: `https://login.microsoftonline.com/<tenant_id>/discovery/v2.0/keys`.
+  - `AUTH_EXPECTED_ISS`: Expected issuer. Example: `https://login.microsoftonline.com/<tenant_id>/v2.0`.
+  - `AUTH_EXPECTED_AUD`: Expected audience (App ID URI or Client ID). Example: `api://<app_id>` or `<client_id>`.
+  - `AUTH_ACCEPTED_ALGS`: Allowed algs (comma‑sep). Default `RS256`.
+  - `AUTH_LEEWAY_SECONDS`: Clock skew allowance for `exp/nbf/iat`. Example: `60`.
+  - `AUTH_PREFER_EXP_REASON`: If `true`, when signature fails but payload `exp` is in the past, the error description will say “The access token expired” (dev aid).
+- Behavior & Errors:
+  - Returns `401` with `WWW-Authenticate: Bearer ...` containing `error_description` (e.g., “The access token expired” or “Signature verification failed”).
+  - With `APP_DEBUG=true`, response JSON adds `reason` and `error` for easier local debugging.
+- Test Secure Endpoint:
+  - No token: `curl -i http://localhost:8000/api/v1/secure/health` → `401` with `WWW-Authenticate` header.
+  - Wrong signature: Set `AUTH_JWKS_URL` to a JWKS that does not have the token’s key, call with any RS256 token → `401` signature failure.
+  - Expired token: Use a correctly signed token with `exp` in the past → `401` with “The access token expired”. If you don’t have a real IdP, you can:
+    - Generate keys: `openssl genrsa -out storage/keys/dev-jwt.key 2048 && openssl rsa -in storage/keys/dev-jwt.key -pubout -out storage/keys/dev-jwt.pub`
+    - Create `storage/keys/jwks.json` with your public key (kid `dev-key-1`). Serve it: `php -S 127.0.0.1:8001 -t storage/keys`
+    - Set: `AUTH_JWKS_URL=http://127.0.0.1:8001/jwks.json`, `AUTH_EXPECTED_ISS=http://localhost`, `AUTH_EXPECTED_AUD=local-api`.
+    - Mint a token (PHP snippet using `firebase/php-jwt`) with `exp` in the past and header `{ "kid": "dev-key-1", "alg": "RS256" }`, then call the secure endpoint with it.
+  - Not‑before (`nbf`) test: Mint a token with future `nbf` → `401` with “not yet valid”.
+- Scopes:
+  - Add middleware params like `->middleware('auth.jwt:example.read')` to a route.
+  - Token claims checked: `scope` (space‑sep), `scp` (Azure), and `roles`.
 
-Service Communication (Async)
-- RabbitMQ enabled via `vladimir-yuldashev/laravel-queue-rabbitmq` and `php-amqplib`.
-- Configure via `.env` (exchange, DLX, queue). Idempotency helper `App\Support\Idempotency\IdempotencyStore` to dedupe consumers.
-- Example consumer: dispatch `App\Jobs\ExampleEventConsumer` onto `rabbitmq` connection.
-- Publisher: `App\Messaging\Publisher` publishes raw AMQP messages with headers (e.g., `Idempotency-Key`).
+**Resilient HTTP (Outbound)**
+- Why: External APIs fail transiently. Retries, jitter, and circuit breaker reduce user‑visible errors.
+- Files:
+  - `app/Support/Http/ResilientHttpClient.php`: Wrapper around Laravel HTTP with resilience policies.
+  - `app/Clients/ExampleApiClient.php`: Example typed wrapper per target.
+  - `config/micro.php:9`: Defaults under `http.defaults`; per‑target under `http.targets`.
+- Key Options (`config/micro.php > http.defaults`):
+  - `timeout_ms`: Per request timeout.
+  - `retries`, `retry_base_ms`, `retry_max_ms`, `jitter`: Backoff behavior.
+  - `breaker_failure_threshold`, `breaker_reset_ms`: Simple circuit breaker.
+  - `hedge.enabled`, `hedge.delay_ms`: Optional parallel hedged requests.
+- OAuth2 & Audience (`config/micro.php > http.oauth2`):
+  - `OAUTH2_TOKEN_URL`, `OAUTH2_CLIENT_ID`, `OAUTH2_CLIENT_SECRET`, `OAUTH2_SCOPES`, `OAUTH2_AUDIENCE`, cache TTL.
+- mTLS (`config/micro.php > http.mtls`):
+  - `MTLS_CA_PATH`, `MTLS_CERT_PATH`, `MTLS_KEY_PATH`, `MTLS_KEY_PASSPHRASE`.
+- Test Quickly:
+  - Create a small route or tinker: `php artisan tinker` then instantiate `new App\Support\Http\ResilientHttpClient('example')` and call `$client->get('/path')` after setting `EXAMPLE_API_BASE_URL`.
+  - Adjust `HTTP_DEFAULT_RETRIES` and observe logs on intermittent failures.
 
-Service Communication (Sync / HTTP)
-- `App\Support\Http\ResilientHttpClient` wraps Laravel HTTP with:
-  - timeouts, retries (exponential + jitter), circuit breaker, header propagation for correlation ids, optional OAuth2 client-credentials, mTLS.
-- Add per-target config in `config/micro.php` under `http.targets` and env stubs in `.env.example`.
-- Typed client example: `App\Clients\ExampleApiClient` with DTOs left to implement per team style.
+**Messaging (RabbitMQ)**
+- Why: Decouple operations and process asynchronously.
+- Files:
+  - `config/queue.php`: RabbitMQ connection, DLX/parking‑lot options.
+  - `app/Messaging/Publisher.php`: Publishes AMQP messages with headers.
+  - `app/Jobs/ExampleEventConsumer.php`: Example consumer job.
+- Env Options (excerpt):
+  - `RABBITMQ_*`: Host, vhost, exchange, queue, DLX, SSL verification settings.
+- Test Locally:
+  - Publish via CLI: `php artisan mq:publish-example --producer=amqp` (direct) or `--producer=queue` (queue job).
+  - Consume: `php artisan queue:work rabbitmq --sleep=1 --tries=5`.
+  - Tip: bind your queue to the exchange with expected routing keys (e.g., `users.*`).
 
-Security
-- JWT resource server validation via JWKS: `app/Http/Middleware/JwtAuthenticate.php`.
-  - Config in `config/micro.php > security.jwt`. Use route middleware `auth.jwt:scope1,scope2`.
-- mTLS (egress): configure certs in `.env` and they are applied in outbound HTTP module.
-- Field-level encryption: `App\Security\FieldEncryption` supports key rotation with versioned keys.
+**Observability**
+- Why: Know health and performance at a glance.
+- Health: `GET /api/v1/health` checks app/DB readiness. Duplicate under `/api/v1/secure/health`.
+- Metrics: `GET /api/v1/metrics` returns Prometheus format using in‑memory registry from `AppServiceProvider`.
+- Logs & Correlation:
+  - Correlation IDs propagate via headers; JSON logs include correlation context.
+  - Customize formatters/handlers in `config/logging.php`.
 
-Authentication (JWT Bearer)
-- Scheme: Reusable OpenAPI security scheme `bearerAuth` defined in `app/Http/Controllers/Docs/Security.php`.
-- Routes: Secured variants are exposed under `/api/v1/secure/*` and enforced with `auth.jwt` middleware using scope checks.
-- Env configuration (`.env`):
+**Feature Flags**
+- Why: Gradually roll out changes and toggle behavior safely.
+- Files:
+  - `app/FeatureFlags/*`: Interface and default array driver.
+  - `config/micro.php > feature_flags`: In‑memory flags for dev.
+- Test:
+  - Set a flag in `config/micro.php` (array driver), e.g., `'example.canary' => true`.
+  - Check in code: `app(\App\FeatureFlags\FeatureFlagClient::class)->enabled('example.canary')`.
 
-```env
-AUTH_JWKS_URL=https://issuer.example.com/.well-known/jwks.json
-AUTH_EXPECTED_ISS=https://issuer.example.com/
-AUTH_EXPECTED_AUD=your-api-audience
-AUTH_ACCEPTED_ALGS=RS256
-```
+**Field Encryption**
+- Why: Protect sensitive fields at rest with app‑level encryption and key rotation.
+- Files:
+  - `app/Security/FieldEncryption.php`: Encrypt/decrypt with versioned keys.
+  - `config/micro.php > security.field_encryption`: Active version and key list.
+- Test:
+  - Add a key version in config, set `active_version`, call `FieldEncryption::encrypt('data')` then `decrypt(...)`.
 
-- Example curl:
+**OpenAPI / Swagger**
+- Why: Document your API for discoverability and integration.
+- Generate: `php artisan l5-swagger:generate` then open `http://localhost:8000/api/documentation`.
+- Security: Click “Authorize” and paste `Bearer <your-jwt>` to try secured endpoints.
 
-```bash
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/secure/users
-```
+**API Endpoints (Map)**
+- Users: `GET/POST /api/v1/users`, `GET/PUT/DELETE /api/v1/users/{id}`; secured versions under `/api/v1/secure/...`.
+- Health: `GET /api/v1/health` and `/api/v1/secure/health`.
+- Metrics: `GET /api/v1/metrics` and `/api/v1/secure/metrics`.
+- Samples: `GET /api/v1/widgets/{id}`, `POST /api/v1/test/validation` (+ secured clones).
 
-> [!TIP]
-> You can also test unsecured routes without a token (see “API Endpoints” below). This lets you compare secured vs unsecured implementations quickly.
+**Troubleshooting**
+- JWT 401:
+  - Check `.env` `AUTH_*` values; ensure token `iss`/`aud` match.
+  - Inspect `WWW-Authenticate` header for reason; set `APP_DEBUG=true` to include `reason` in JSON.
+  - Clear caches after env changes: `php artisan config:clear && php artisan cache:clear`.
+- RabbitMQ:
+  - Verify exchange/queue bindings and credentials. Ensure `queue:work` is running.
+- Swagger UI empty:
+  - Regenerate spec: `php artisan l5-swagger:generate` and refresh the page.
 
-Traceability
-- Correlation/Request IDs generated on ingress and added to responses.
-- IDs propagate to logs, outbound HTTP headers, and can be added to AMQP headers.
-- JSON structured logs with correlation processor; customize in `config/logging.php`.
-
-Observability
-- Prometheus metrics endpoint: `/api/v1/metrics` using in-memory registry (swap to Redis/APCu in prod).
-- Health: `/api/v1/health` (includes DB connectivity check). Extend as needed.
-- CloudWatch / Grafana: integrate via log shipping / exporters; stubs provided via JSON logger and metrics registry.
-
-API Endpoints (Unsecured vs Secured)
-- Users (CRUD)
-  - Unsecured: `GET/POST /api/v1/users`, `GET/PUT/DELETE /api/v1/users/{id}`
-  - Secured: `GET/POST /api/v1/secure/users`, `GET/PUT/DELETE /api/v1/secure/users/{id}`
-  - Scopes: `example.read` for read, `example.write` for write
-- Health
-  - Unsecured: `GET /api/v1/health`
-  - Secured: `GET /api/v1/secure/health` (requires Bearer)
-- Metrics
-  - Unsecured: `GET /api/v1/metrics`
-  - Secured: `GET /api/v1/secure/metrics` (requires Bearer)
-- Samples
-  - Unsecured: `GET /api/v1/widgets/{id}`, `POST /api/v1/test/validation`
-  - Secured: `GET /api/v1/secure/widgets/{id}`, `POST /api/v1/secure/test/validation`
-
-> [!WARNING]
-> Do not expose sensitive write operations without authentication in production. The unsecured endpoints are provided for learning and can be removed or disabled via route groups once teams align on auth enforcement.
-
-API Documentation & Versioning
-- L5 Swagger configured (`config/l5-swagger.php`). Generate with `php artisan l5-swagger:generate`.
-- Versioned routes under `/api/v1/...`. Add `/api/v2/...` as needed and include deprecation headers in controllers.
-
-OpenAPI / Swagger
-- Generate spec/UI:
-
-```bash
-php artisan l5-swagger:generate
-# Open the UI
-open http://localhost:8080/api/documentation
-```
-
-- Security:
-  - Click “Authorize” in Swagger UI and paste `Bearer <your-jwt>`.
-  - Secured paths declare `security: [{ bearerAuth: [] }]` via annotations on their operations.
-
-> [!NOTE]
-> A CI helper `php artisan docs:assert-covered` is included to verify routes are covered by the OpenAPI spec. Run it locally to catch undocumented endpoints early.
-
-Progressive Delivery
-- Feature flags abstraction with `FeatureFlagClient`. Default array driver; add LaunchDarkly/Unleash adapters later.
-- Canary examples: gate usage in code with `FeatureFlagClient::enabled('flag')` and route toggles.
-- Blue/Green: Docker + health/metrics endpoints ready; add deployment scripts in CI.
-
-Dockerization
-- Multi-stage `Dockerfile` (composer vendor + PHP-FPM runtime), non-root, opcache.
-- `docker-compose.yml`: app (php-fpm), nginx, mysql, rabbitmq; with healthchecks.
-- Place TLS certs in a bind-mount or secrets and reference via `.env`.
-
-Configuration
-- Centralized microservice config: `config/micro.php` and `.env.example` for all knobs (HTTP, OAuth2, JWT, mTLS, features, metrics).
-- Queue: `config/queue.php` includes `rabbitmq` connection with DLX/parking-lot properties.
-
-Database
-- Example Product model + migration + seeder; repository pattern in `app/Repositories`.
-- DB health check invoked in `/api/v1/health`.
-
-Testing
-- Unit: HTTP client retry test in `tests/Unit/ResilientHttpClientTest.php`.
-- Feature: health endpoint test in `tests/Feature/HealthTest.php`.
-- Add: consumer idempotency tests, JWT middleware tests, and contract tests (Pact/OpenAPI) as you expand.
-
-Messaging Examples
-- Publish an outbound domain event (from a service/controller):
-
-```php
-use App\Messaging\Publisher;
-use Illuminate\Support\Str;
-
-$payload = [
-    'id' => (string) Str::uuid(),
-    'type' => 'users.created',
-    'source' => 'svc.users',
-    'time' => now()->toIso8601String(),
-    'schemaVersion' => '1.0',
-    'data' => [
-        'userId' => $user->id,
-        'email' => $user->email,
-    ],
-];
-
-$headers = [
-    'Idempotency-Key' => $payload['id'],
-    'X-Correlation-Id' => app()->bound('correlation_id') ? app('correlation_id') : (string) Str::uuid(),
-];
-
-(new Publisher())->publish('users.created', $payload, $headers);
-```
-
-- CLI demo (AMQP vs Queue):
-
-```bash
-# Publish directly via AMQP
-php artisan mq:publish-example --producer=amqp
-
-# Or dispatch a job onto the rabbitmq queue
-php artisan mq:publish-example --producer=queue
-```
-
-- Consume inbound events (workers):
-
-```bash
-php artisan queue:work rabbitmq --sleep=1 --tries=5
-```
-
-> [!TIP]
-> Bind your queue (e.g., `app.queue`) to the exchange (e.g., `app.exchange`) with specific routing keys (e.g., `users.*`) in RabbitMQ so your worker receives only the events you care about.
-
-> [!IMPORTANT]
-> For strong delivery guarantees, consider the Outbox pattern (persist events in the same DB transaction as your write; a background process publishes reliably and marks them sent).
-
-CI/CD (example outline)
+**CI/CD Hints**
 - Lint: `./vendor/bin/pint`
 - Tests: `php artisan test --coverage-text`
-- Build: `docker build -t your-org/service:sha-$(git rev-parse --short HEAD) .`
-- OpenAPI: `php artisan l5-swagger:generate` and publish `storage/api-docs` as artifact.
-
-Troubleshooting
-- JWT 401 on secured endpoints
-  - Check `.env` values for `AUTH_*` settings and token `iss`/`aud` claims.
-  - Ensure your Authorization header is `Bearer <token>` (no quotes).
-- Queue worker not receiving messages
-  - Verify RabbitMQ bindings from queue to exchange with expected routing keys.
-  - Confirm `QUEUE_CONNECTION=rabbitmq` and the worker command is running.
-- AMQP publish fails
-  - Confirm RabbitMQ host/port/creds in `.env` and that the exchange exists.
-- Swagger UI shows no security
-  - Regenerate docs: `php artisan l5-swagger:generate` and reload the page.
+- OpenAPI artifact: publish `storage/api-docs` from CI.
 
 Notes
-- ext-sockets must be enabled for RabbitMQ. On Windows/XAMPP, uncomment `extension=sockets` in `php.ini`.
-- For production, prefer Redis/APCu storage for Prometheus and a persistent cache for OAuth2/JWKS.
+- Keep secrets out of Git. Use environment variables or secret stores.
+- For production, consider Redis/APCu for Prometheus storage and a persistent cache for OAuth2/JWKS.
+
+Docker Usage (All Features)
+
+Run the stack
+- Build and start: `docker compose up --build -d`
+- App (Nginx): http://localhost:8080
+- Logs: `docker compose logs -f app` (PHP-FPM), `docker compose logs -f web` (Nginx)
+- Tests: `docker compose exec app php artisan test`
+- Tinker REPL: `docker compose exec app php artisan tinker`
+
+RabbitMQ
+- Management UI: http://localhost:15672 (guest/guest)
+- Publish example (AMQP): `docker compose exec app php artisan mq:publish-example --producer=amqp`
+- Publish via queue: `docker compose exec app php artisan mq:publish-example --producer=queue`
+- Start worker: `docker compose exec app php artisan queue:work rabbitmq --sleep=1 --tries=5`
+
+OpenAPI / Swagger
+- Generate docs: `docker compose exec app php artisan l5-swagger:generate`
+- Open UI: http://localhost:8080/api/documentation
+
+Prometheus (Metrics)
+- Run Prometheus: `docker run -p 9090:9090 -v $PWD/prom.yml:/etc/prometheus/prometheus.yml prom/prometheus`
+- Example `prom.yml`:
+
+```
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: 'laravel-service'
+    metrics_path: /api/v1/metrics
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+# If Prometheus runs in the same docker-compose network, target nginx by name:
+#   - targets: ['web:80']
+```
+
+Add custom metrics in code
+
+```
+$registry = app(\Prometheus\CollectorRegistry::class);
+$counter = $registry->getOrRegisterCounter('app', 'users_created_total', 'Total users created');
+$counter->inc();
+```
+
+JWT (Local testing)
+- Generate RSA keys (host or container):
+  - `openssl genrsa -out storage/keys/dev-jwt.key 2048`
+  - `openssl rsa -in storage/keys/dev-jwt.key -pubout -out storage/keys/dev-jwt.pub`
+- Create `storage/keys/jwks.json` from the public key (`kid` e.g., `dev-key-1`).
+- Serve JWKS: `php -S 127.0.0.1:8001 -t storage/keys`
+- Configure `.env`:
+  - `AUTH_JWKS_URL=http://host.docker.internal:8001/jwks.json`
+  - `AUTH_EXPECTED_ISS=http://localhost`
+  - `AUTH_EXPECTED_AUD=local-api`
+- Call a secured route with an RS256 token:
+  - `curl -i -H "Authorization: Bearer <token>" http://localhost:8080/api/v1/secure/health`
+
+Resilient HTTP demo
+- Set `EXAMPLE_API_BASE_URL=https://httpbin.org` in `.env`.
+- Try via Tinker:
+  - `docker compose exec app php artisan tinker`
+  - `>>> $c = new App\Support\Http\ResilientHttpClient('example');`
+  - `>>> $c->get('/status/200');`
+
+Database
+- MySQL container is exposed on `localhost:3307` (user `app`, pass `app`, DB `laravel`).
+- Optionally switch from SQLite to MySQL by updating `.env` and running migrations inside the container.
+
+**Feature Flags (How-To)**
+- Why: Gradually roll out changes and toggle behavior safely without redeploys.
+
+- What it is:
+  - Interface: `app/FeatureFlags/FeatureFlagClient.php` exposes `enabled(string $flag, array $context = []): bool`.
+  - Default driver: `app/FeatureFlags/ArrayFeatureFlags.php` reads flags from config (simple on/off).
+  - Config root: `config/micro.php > feature_flags`.
+
+- Use in code:
+  - Inject the client (preferred):
+    ```php
+    use App\FeatureFlags\FeatureFlagClient;
+
+    class UsersController extends Controller
+    {
+        public function index(FeatureFlagClient $flags)
+        {
+            if ($flags->enabled('users.new-list-view')) {
+                // new behavior
+            } else {
+                // old behavior
+            }
+        }
+    }
+    ```
+  - Or resolve on demand:
+    ```php
+    $flags = app(\App\FeatureFlags\FeatureFlagClient::class);
+    if ($flags->enabled('example.canary')) { /* ... */ }
+    ```
+
+- Local/Dev (simple on/off):
+  - Set driver in `.env`: `FEATURE_FLAGS_DRIVER=array`.
+  - Define flags in `config/micro.php` under `feature_flags.drivers.array.flags`, e.g.:
+    ```php
+    'feature_flags' => [
+        'driver' => env('FEATURE_FLAGS_DRIVER', 'array'),
+        'drivers' => [
+            'array' => [
+                'flags' => [
+                    'example.canary' => (bool) env('FF_EXAMPLE_CANARY', false),
+                    'users.new-list-view' => (bool) env('FF_USERS_NEW_LIST_VIEW', false),
+                ],
+            ],
+        ],
+    ],
+    ```
+  - Toggle via `.env`:
+    ```env
+    FF_EXAMPLE_CANARY=true
+    FF_USERS_NEW_LIST_VIEW=false
+    ```
+  - Apply changes: `php artisan config:clear` (or `config:cache`).
+
+- QA/Staging (env-driven):
+  - Keep `FEATURE_FLAGS_DRIVER=array` and flip flags through environment variables (no code change).
+  - Example `.env.staging`:
+    ```env
+    FEATURE_FLAGS_DRIVER=array
+    FF_USERS_NEW_LIST_VIEW=true
+    ```
+
+- Production (best practices):
+  - Default risky features to off; enable via env during rollout.
+  - Add observability around flag usage:
+    ```php
+    use Illuminate\Support\Facades\Log;
+    $reg = app(\Prometheus\CollectorRegistry::class);
+    $ctr = $reg->getOrRegisterCounter('app', 'flag_users_new_list_on_total', 'Times new list was used');
+
+    if ($flags->enabled('users.new-list-view')) {
+        Log::info('flag.on', ['flag' => 'users.new-list-view']);
+        $ctr->inc();
+    }
+    ```
+  - Keep a kill switch flag for quick rollback.
+
+- Testing flags:
+  - Override config in tests:
+    ```php
+    config(['micro.feature_flags.drivers.array.flags.example.canary' => true]);
+    ```
+  - Or bind a fake client:
+    ```php
+    $this->app->bind(\App\FeatureFlags\FeatureFlagClient::class, function () {
+        return new class implements \App\FeatureFlags\FeatureFlagClient {
+            public function enabled(string $flag, array $ctx = []): bool { return $flag === 'example.canary'; }
+        };
+    });
+    ```
+
+- Providers (future: LaunchDarkly/Unleash):
+  - Stubs exist in `config/micro.php` for provider settings. To integrate, implement an adapter that satisfies `FeatureFlagClient` and wire it in `AppServiceProvider` based on `FEATURE_FLAGS_DRIVER`.
+  - LaunchDarkly env (example):
+    ```env
+    FEATURE_FLAGS_DRIVER=launchdarkly
+    FEATURE_FLAGS_LAUNCHDARKLY_SDK_KEY=your-sdk-key
+    ```
+  - Unleash env (example):
+    ```env
+    FEATURE_FLAGS_DRIVER=unleash
+    FEATURE_FLAGS_UNLEASH_URL=https://unleash.example.com/
+    FEATURE_FLAGS_UNLEASH_TOKEN=your-token
+    ```
+
+**JWT Auth (How-To)**
+- Why: Authenticate callers using industry‑standard Bearer tokens with public keys (JWKS).
+- Configure `.env`:
+  - `AUTH_JWKS_URL=https://login.microsoftonline.com/<tenant_id>/discovery/v2.0/keys`
+  - `AUTH_EXPECTED_ISS=https://login.microsoftonline.com/<tenant_id>/v2.0`
+  - `AUTH_EXPECTED_AUD=<client_id or api://app_id>`
+  - Optional: `AUTH_ACCEPTED_ALGS=RS256`, `AUTH_LEEWAY_SECONDS=60`, `AUTH_PREFER_EXP_REASON=false`
+- Apply and test:
+  - `php artisan config:clear && php artisan cache:clear`
+  - No token: `curl -i http://localhost:8080/api/v1/secure/health` → 401 with `WWW-Authenticate`
+  - Valid token: `curl -i -H "Authorization: Bearer <token>" http://localhost:8080/api/v1/secure/health` → 200
+- Scopes on routes:
+  - Example: `Route::get('/secure/users', ...)->middleware('auth.jwt:example.read');`
+  - Token claims checked: `scope` (space‑sep), `scp` (Azure), and `roles`.
+- Troubleshooting:
+  - Enable `APP_DEBUG=true`; check `storage/logs/laravel.log` for “JWT header parsed”, “JWKS loaded”, and failure details including `exp/nbf/iat`.
+
+**Resilient HTTP (How-To)**
+- Why: Make outbound HTTP calls robust with timeouts, retries, jitter, breaker, OAuth2, and mTLS.
+- Configure defaults (`.env`):
+  - `HTTP_DEFAULT_TIMEOUT_MS=2000`, `HTTP_DEFAULT_RETRIES=2`, `HTTP_DEFAULT_RETRY_BASE_MS=200`, `HTTP_DEFAULT_RETRY_MAX_MS=1500`, `HTTP_DEFAULT_JITTER=true`
+  - `HTTP_DEFAULT_BREAKER_FAILURE_THRESHOLD=5`, `HTTP_DEFAULT_BREAKER_RESET_MS=30000`
+- Per‑target example (`.env`):
+  - `EXAMPLE_API_BASE_URL=https://httpbin.org`
+  - Optional: `EXAMPLE_API_TIMEOUT_MS`, `EXAMPLE_API_RETRIES`, `EXAMPLE_API_SCOPES`
+- Use in code:
+  - Generic: `new App\Support\Http\ResilientHttpClient('example')`
+  - Typed: `new App\Clients\ExampleApiClient()`
+  - Tinker:
+    - `docker compose exec app php artisan tinker`
+    - `>>> $c = new App\Support\Http\ResilientHttpClient('example');`
+    - `>>> $c->get('/status/200');`
+- OAuth2 client credentials:
+  - Set: `OAUTH2_TOKEN_URL`, `OAUTH2_CLIENT_ID`, `OAUTH2_CLIENT_SECRET`, `OAUTH2_SCOPES` (e.g., `api://target/.default`)
+  - The client fetches/caches the token and sends `Authorization: Bearer <token>`.
+- mTLS:
+  - Set: `MTLS_CA_PATH`, `MTLS_CERT_PATH`, `MTLS_KEY_PATH`, `MTLS_KEY_PASSPHRASE` to use client certificates.
+
+**Messaging (How-To)**
+- Why: Publish/consume events asynchronously via RabbitMQ.
+- Configure `.env`:
+  - `QUEUE_CONNECTION=rabbitmq` and `RABBITMQ_*` (host, port, vhost, exchange, routing key, queue).
+- Start and open UI:
+  - `docker compose up -d` and open http://localhost:15672 (guest/guest)
+- Publish examples:
+  - Direct AMQP: `docker compose exec app php artisan mq:publish-example --producer=amqp`
+  - Queue job: `docker compose exec app php artisan mq:publish-example --producer=queue`
+- Consume:
+  - `docker compose exec app php artisan queue:work rabbitmq --sleep=1 --tries=5`
+- Publish in code:
+  - `(new App\Messaging\Publisher())->publish('users.created', $payload, $headers);`
+- Tip: Bind your queue to the exchange with routing keys (e.g., `users.*`).
+
+**Observability (How-To)**
+- Health:
+  - `curl http://localhost:8080/api/v1/health` → checks app/DB readiness.
+  - Extend checks in `app/Http/Controllers/HealthController.php`.
+- Prometheus:
+  - Run: `docker run -p 9090:9090 -v $PWD/prom.yml:/etc/prometheus/prometheus.yml prom/prometheus`
+  - prom.yml:
+    ```
+    global:
+      scrape_interval: 15s
+    scrape_configs:
+      - job_name: 'laravel-service'
+        metrics_path: /api/v1/metrics
+        static_configs:
+          - targets: ['host.docker.internal:8080']
+    ```
+  - Custom metric:
+    ```php
+    $reg = app(\Prometheus\CollectorRegistry::class);
+    $ctr = $reg->getOrRegisterCounter('app', 'users_created_total', 'Total users created');
+    $ctr->inc();
+    ```
+- Logging:
+  - Set `LOG_CHANNEL=stack`, `LOG_STACK=stderr,daily`, `LOG_LEVEL=info` in prod.
+  - Use: `Log::emergency|alert|critical|error|warning|notice|info|debug()`.
+  - JSON logs include correlation IDs via `App\Logging\TapJsonFormatter` and `CorrelationProcessor`.
+
+**OpenAPI / Swagger (How-To)**
+- Generate docs/UI:
+  - `docker compose exec app php artisan l5-swagger:generate`
+  - Open http://localhost:8080/api/documentation, click “Authorize” to test secured endpoints.
+- Annotate endpoints with `@OA\Get`, `@OA\Post`, etc. Secured operations include `security={{"bearerAuth": {}}}`.
+
+**Field Encryption (How-To)**
+- Why: Encrypt sensitive fields with key rotation.
+- Configure keys in `config/micro.php`:
+  ```php
+  'field_encryption' => [
+      'active_version' => env('PII_KEY_ACTIVE_VERSION', 'v1'),
+      'keys' => [
+          'v1' => env('PII_KEY_V1'),
+          // 'v2' => env('PII_KEY_V2'),
+      ],
+  ],
+  ```
+- Use in code:
+  ```php
+  use App\Security\FieldEncryption;
+  $cipher = FieldEncryption::encrypt('secret data');
+  $plain = FieldEncryption::decrypt($cipher);
+  ```
+- Tips:
+  - Store encrypted values as `TEXT`/`VARCHAR`; keep historical keys configured to decrypt legacy data after rotation.
