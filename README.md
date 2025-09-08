@@ -395,8 +395,24 @@ Database
     ```
 - Logging:
   - Set `LOG_CHANNEL=stack`, `LOG_STACK=stderr,daily`, `LOG_LEVEL=info` in prod.
+  - Format options via `LOG_FORMAT`:
+    - `json` (default): structured JSON, best for log aggregation.
+    - `line`: human-friendly, Serilog-style single-line format.
+  - Example `LOG_FORMAT=line` output:
+    ```
+    [2025-03-21 13:49:49.782 -07:00|INF|abc123 (req-42)|app] NEW PROCESS STARTING ----------
+    [2025-03-21 13:49:53.375 -07:00|WRN|abc123 ()|Host] Log incoming http headers? 'true'.
+    [2025-03-21 13:49:54.001 -07:00|ERR|abc123 (req-42)|Http] Downstream call failed {"status":502,"target":"example"}
+    ```
+    - Format: `[timestamp|LEVEL|correlation_id (request_id)|channel] message {context}`
+    - `timestamp`: honors `APP_TIMEZONE` (e.g., `America/Los_Angeles`).
+    - `LEVEL`: short codes DBG/INF/NOT/WRN/ERR/CRT/ALR/EMG.
+    - `correlation_id` and `request_id`: injected by `CorrelationProcessor` for traceability.
+    - `channel`: Monolog channel (often the Laravel channel or a logical source).
+    - `{context}`: optional JSON-encoded context appended when present.
   - Use: `Log::emergency|alert|critical|error|warning|notice|info|debug()`.
-  - JSON logs include correlation IDs via `App\Logging\TapJsonFormatter` and `CorrelationProcessor`.
+  - Implementation: `App\Logging\TapJsonFormatter` selects JSON vs line and attaches correlation extras.
+  - Tip: set `APP_TIMEZONE` for correct offset, and keep `LOG_LEVEL=info` (or `warning`) in production to reduce noise.
 
 **OpenAPI / Swagger (How-To)**
 - Generate docs/UI:
