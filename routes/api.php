@@ -19,6 +19,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/metrics', [MetricsController::class, 'metrics']);
 
     // Products API (example using repository + Swagger annotations)
+    Route::get('/products', [ProductController::class, 'index']);
     Route::get('/products/{sku}', [ProductController::class, 'show']);
     Route::post('/products', [ProductController::class, 'store']);
 

@@ -7,6 +7,25 @@ use App\Repositories\Contracts\ProductRepositoryInterface;
 
 /**
  * @OA\Get(
+ *   path="/api/v1/products",
+ *   operationId="listProducts",
+ *   tags={"Products"},
+ *   summary="List products",
+ *   @OA\Parameter(
+ *     name="limit",
+ *     in="query",
+ *     required=false,
+ *     description="Max number of products to return",
+ *     @OA\Schema(type="integer", default=50, minimum=1, maximum=200)
+ *   ),
+ *   @OA\Response(
+ *     response=200,
+ *     description="List of products",
+ *     @OA\JsonContent(type="array", @OA\Items(ref="#/components/schemas/Product"))
+ *   )
+ * )
+ *
+ * @OA\Get(
  *   path="/api/v1/products/{sku}",
  *   operationId="getProductBySku",
  *   tags={"Products"},
@@ -54,6 +73,14 @@ class ProductController extends Controller
     {
     }
 
+    public function index(Request $request)
+    {
+        $limit = (int) $request->query('limit', 50);
+        $limit = max(1, min(200, $limit));
+        $items = $this->products->getAll($limit);
+        return response()->json($items);
+    }
+
     public function show(string $sku)
     {
         $product = $this->products->findBySku($sku);
@@ -76,4 +103,3 @@ class ProductController extends Controller
         return response()->json($created, 201);
     }
 }
-

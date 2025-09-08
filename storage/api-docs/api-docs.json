@@ -247,42 +247,43 @@
                 ]
             }
         },
-        "/api/v1/products/{sku}": {
+        "/api/v1/products": {
             "get": {
                 "tags": [
                     "Products"
                 ],
-                "summary": "Get a product by SKU",
-                "operationId": "getProductBySku",
+                "summary": "List products",
+                "operationId": "listProducts",
                 "parameters": [
                     {
-                        "name": "sku",
-                        "in": "path",
-                        "description": "The product SKU",
-                        "required": true,
+                        "name": "limit",
+                        "in": "query",
+                        "description": "Max number of products to return",
+                        "required": false,
                         "schema": {
-                            "type": "string"
+                            "type": "integer",
+                            "default": 50,
+                            "maximum": 200,
+                            "minimum": 1
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Product found",
+                        "description": "List of products",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Product"
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/Product"
+                                    }
                                 }
                             }
                         }
-                    },
-                    "404": {
-                        "description": "Product not found"
                     }
                 }
-            }
-        },
-        "/api/v1/products": {
+            },
             "post": {
                 "tags": [
                     "Products"
@@ -331,6 +332,41 @@
                     },
                     "422": {
                         "description": "Validation error"
+                    }
+                }
+            }
+        },
+        "/api/v1/products/{sku}": {
+            "get": {
+                "tags": [
+                    "Products"
+                ],
+                "summary": "Get a product by SKU",
+                "operationId": "getProductBySku",
+                "parameters": [
+                    {
+                        "name": "sku",
+                        "in": "path",
+                        "description": "The product SKU",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Product found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Product"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Product not found"
                     }
                 }
             }
