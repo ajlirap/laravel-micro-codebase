@@ -3,8 +3,9 @@
 namespace App\Repositories;
 
 use App\Models\Product;
+use App\Repositories\Contracts\ProductRepositoryInterface;
 
-class ProductRepository
+class ProductRepository implements ProductRepositoryInterface
 {
     public function findBySku(string $sku): ?Product
     {
@@ -16,4 +17,3 @@ class ProductRepository
         return Product::create($data);
     }
 }
-

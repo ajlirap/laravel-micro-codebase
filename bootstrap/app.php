@@ -11,6 +11,10 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withProviders([
+        \App\Providers\AppServiceProvider::class,
+        \App\Providers\RepositoryServiceProvider::class,
+    ])
     ->withCommands([
         \App\Console\Commands\PublishExampleEvent::class,
         \App\Console\Commands\DocsAssertCovered::class,
