@@ -413,6 +413,14 @@ Database
   - Use: `Log::emergency|alert|critical|error|warning|notice|info|debug()`.
   - Implementation: `App\Logging\TapJsonFormatter` selects JSON vs line and attaches correlation extras.
   - Tip: set `APP_TIMEZONE` for correct offset, and keep `LOG_LEVEL=info` (or `warning`) in production to reduce noise.
+  - Request/Response logging:
+    - Enabled globally for API routes via middleware `App\Http\Middleware\RequestResponseLogger`.
+    - Env toggles:
+      - `LOG_HTTP_ALL_ROUTES=false` (set true to also log non-API routes)
+      - `LOG_HTTP_REQUEST_BODY=false` (log small textual request bodies)
+      - `LOG_HTTP_RESPONSE_BODY=false` (log small textual response bodies)
+      - `LOG_HTTP_MAX_BODY=2048` (max bytes to log for bodies)
+    - Each request logs `http.request` with method, path, headers (safely redacted), and optional body; response logs `http.response` with status and duration_ms.
 
 **OpenAPI / Swagger (How-To)**
 - Generate docs/UI:

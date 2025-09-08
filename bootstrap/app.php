@@ -17,6 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(\App\Http\Middleware\CorrelationId::class);
+        // Log API requests/responses (see LOG_HTTP_* env toggles)
+        $middleware->append(\App\Http\Middleware\RequestResponseLogger::class);
         $middleware->alias(['auth.jwt' => \App\Http\Middleware\JwtAuthenticate::class]);
         // Apply formatter to API group only
         $middleware->appendToGroup('api', \App\Http\Middleware\ApiResponseFormatter::class);
