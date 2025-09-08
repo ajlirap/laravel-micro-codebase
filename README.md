@@ -22,7 +22,7 @@ Quick Start
 Why These Features
 - Security: Protect write/read endpoints with industry‑standard JWT (Bearer) via JWKS; easy to connect to providers like Azure AD.
 - Resilience: Outbound HTTP gets timeouts, retries, jitter, circuit breaker, OAuth2, and mTLS so downstream hiccups don’t break you.
-- Observability: Health and Prometheus metrics expose service health; correlation IDs tie logs/requests together.
+- Observability: Health checks and Grafana dashboards (via Prometheus metrics) expose service health; correlation IDs tie logs/requests together.
 - Messaging: RabbitMQ integration enables async workflows and decoupling.
 - Progressive Delivery: Feature flags let you ship safely (toggle behavior without redeploys).
 
@@ -94,7 +94,7 @@ How To Read This File
 **Observability**
 - Why: Know health and performance at a glance.
 - Health: `GET /api/v1/health` checks app/DB readiness. Duplicate under `/api/v1/secure/health`.
-- Metrics: `GET /api/v1/metrics` returns Prometheus format using in‑memory registry from `AppServiceProvider`.
+- Metrics: `GET /api/v1/metrics` returns Prometheus exposition format (scraped by Prometheus, visualized in Grafana) using the in‑memory registry from `AppServiceProvider`.
 - Logs & Correlation:
   - Correlation IDs propagate via headers; JSON logs include correlation context.
   - Customize formatters/handlers in `config/logging.php`.
@@ -144,7 +144,7 @@ How To Read This File
 
 Notes
 - Keep secrets out of Git. Use environment variables or secret stores.
-- For production, consider Redis/APCu for Prometheus storage and a persistent cache for OAuth2/JWKS.
+- For production, consider Redis/APCu for metrics storage and a persistent cache for OAuth2/JWKS.
 
 Docker Usage (All Features)
 
@@ -165,8 +165,9 @@ OpenAPI / Swagger
 - Generate docs: `docker compose exec app php artisan l5-swagger:generate`
 - Open UI: http://localhost:8080/api/documentation
 
-Prometheus (Metrics)
-- Run Prometheus: `docker run -p 9090:9090 -v $PWD/prom.yml:/etc/prometheus/prometheus.yml prom/prometheus`
+Grafana (Monitoring)
+- Run Prometheus (scraper): `docker run -p 9090:9090 -v $PWD/prom.yml:/etc/prometheus/prometheus.yml prom/prometheus`
+  and Grafana (dashboards): `docker run -p 3000:3000 grafana/grafana`
 - Example `prom.yml`:
 
 ```
@@ -375,7 +376,7 @@ Database
 - Health:
   - `curl http://localhost:8080/api/v1/health` → checks app/DB readiness.
   - Extend checks in `app/Http/Controllers/HealthController.php`.
-- Prometheus:
+- Grafana & Prometheus:
   - Run: `docker run -p 9090:9090 -v $PWD/prom.yml:/etc/prometheus/prometheus.yml prom/prometheus`
   - prom.yml:
     ```
@@ -393,6 +394,7 @@ Database
     $ctr = $reg->getOrRegisterCounter('app', 'users_created_total', 'Total users created');
     $ctr->inc();
     ```
+  - In Grafana: add Prometheus as a data source (URL: your Prometheus server), then create a dashboard using the metric `app_users_created_total`.
 - Logging:
   - Set `LOG_CHANNEL=stack`, `LOG_STACK=stderr,daily`, `LOG_LEVEL=info` in prod.
   - Format options via `LOG_FORMAT`:
