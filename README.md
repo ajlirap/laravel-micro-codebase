@@ -7,6 +7,14 @@ Overview
 Quick Start
 - Requirements: PHP 8.3+, Composer, ext-sockets (for RabbitMQ), Docker optional.
 - Install: `composer install` then copy `.env` from `.env.example` and fill values.
+
+> [!WARNING]
+> `.env` holds your real configuration and secrets for your environment (dev/staging/prod). The app reads these at boot and via `config/micro.php`.
+> - `.env.example` is only a template; copy it to `.env` and replace placeholders with your actual values (JWT issuer/audience, JWKS URL, DB creds, RabbitMQ, etc.).
+> - Do not commit `.env` to Git (it’s already ignored). For production, supply values via environment variables or a secret manager; do not bake secrets into images.
+> - After changing `.env`, run `php artisan config:clear && php artisan cache:clear` so Laravel reloads the new values.
+> - When using Docker, `docker-compose.yml` already points the app to `env_file: .env` for local convenience. In real deployments, pass env vars/secrets from your orchestrator instead.
+
 - Run: `php artisan serve` (or `docker-compose up -d`), open `http://localhost:8000` (or `:8080` via Docker).
 - Try endpoints: `GET /api/v1/health`, `GET /api/v1/metrics`, `GET /api/v1/users`.
 - Swagger UI: `GET /api/documentation` (or `/api/docs` redirect).
