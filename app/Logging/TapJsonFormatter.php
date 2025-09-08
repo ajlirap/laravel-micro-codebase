@@ -18,10 +18,16 @@ class TapJsonFormatter
             // Attach a processor at the logger level (works regardless of handler type)
             $monolog->pushProcessor(new CorrelationProcessor());
 
-            // Apply JSON formatter only to handlers that support it; add processor per handler when supported
+            $format = env('LOG_FORMAT', 'json'); // 'json' | 'line'
+
+            // Apply formatter per handler; also push processor at handler level when supported
             foreach ($monolog->getHandlers() as $handler) {
                 if ($handler instanceof FormattableHandlerInterface) {
-                    $handler->setFormatter(new JsonFormatter());
+                    if ($format === 'line') {
+                        $handler->setFormatter(new SerilogStyleFormatter());
+                    } else {
+                        $handler->setFormatter(new JsonFormatter());
+                    }
                 }
                 if ($handler instanceof ProcessableHandlerInterface) {
                     $handler->pushProcessor(new CorrelationProcessor());
