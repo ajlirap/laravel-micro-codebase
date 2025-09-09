@@ -50,7 +50,7 @@ return [
     |
     */
 
-    'channels' => [
+        'channels' => [
 
         'stack' => [
             'driver' => 'stack',
@@ -119,6 +119,16 @@ return [
             'driver' => 'errorlog',
             'level' => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
+        ],
+
+        // Dedicated channel for HTTP request/response logs
+        'http' => [
+            'driver' => env('LOG_HTTP_DRIVER', 'daily'),
+            'path' => storage_path('logs/http.log'),
+            'level' => env('LOG_HTTP_LEVEL', 'info'),
+            'days' => env('LOG_HTTP_DAYS', 7),
+            'replace_placeholders' => true,
+            'tap' => [\App\Logging\TapJsonFormatter::class],
         ],
 
         'null' => [

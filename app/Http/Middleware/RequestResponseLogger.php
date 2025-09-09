@@ -42,7 +42,7 @@ class RequestResponseLogger
             } catch (\Throwable) {}
         }
 
-        Log::info('http.request', $reqCtx);
+        Log::channel('http')->info('http.request', $reqCtx);
 
         $response = $next($request);
 
@@ -63,7 +63,7 @@ class RequestResponseLogger
             } catch (\Throwable) {}
         }
 
-        Log::info('http.response', $resCtx);
+        Log::channel('http')->info('http.response', $resCtx);
 
         return $response;
     }
@@ -95,4 +95,3 @@ class RequestResponseLogger
         return substr($s, 0, max(0, $max - 3)) . '...';
     }
 }
-
