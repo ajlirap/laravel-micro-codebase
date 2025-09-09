@@ -59,12 +59,25 @@ return [
             'cache_ttl_seconds' => env('AUTH_CACHE_TTL_SECONDS', 3600),
         ],
         'gateway' => [
-            // Shared secret expected from API Gateway in a header.
-            // If null/empty, the middleware will be a no-op.
-            'accepted_secret' => env('ACCEPTED_SECRET'),
-            // Header name the gateway sends. Default: 'Accepted-Secret'.
+            // Shared secret(s) expected from BFF/Gateway/other trusted services.
+            // If empty, the middleware will be a no-op.
+            // Supports multiple comma-separated values via ACCEPTED_SECRETS.
+            // Backwards compatible with ACCEPTED_SECRET (single value).
+            'accepted_secrets' => (function () {
+                $raw = env('ACCEPTED_SECRETS', '');
+                $list = array_map('trim', explode(',', (string) $raw));
+                return array_values(array_filter($list, fn($v) => $v !== ''));
+            })(),
+            // Standard header name preferred: 'X-Internal-Secret'.
             // You may set multiple candidates comma-separated; first match wins.
-            'header_names' => array_filter(array_map('trim', explode(',', env('ACCEPTED_SECRET_HEADER', 'Accepted-Secret,X-Accepted-Secret')))),
+            // Supports ACCEPTED_SECRET_HEADERS (plural) and falls back to ACCEPTED_SECRET_HEADER.
+            'header_names' => (function () {
+                $raw = env('ACCEPTED_SECRET_HEADERS', '');
+                $default = 'X-Internal-Secret,Accepted-Secret,X-Accepted-Secret';
+                $value = $raw !== '' ? $raw : $default;
+                $list = array_map('trim', explode(',', (string) $value));
+                return array_values(array_filter($list, fn($v) => $v !== ''));
+            })(),
         ],
         'field_encryption' => [
             // Key rotation example: keys are stored with versions, e.g., key_v1, key_v2
