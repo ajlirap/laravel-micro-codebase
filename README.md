@@ -59,17 +59,22 @@ How To Read This File
   - Add middleware params like `->middleware('auth.jwt:example.read')` to a route.
   - Token claims checked: `scope` (space-sep), `scp` (Azure), and `roles`.
 
-API Gateway Shared Secret (optional)
-- Why: Ensure traffic comes through your API Gateway by requiring a shared secret header in addition to JWT.
+Trusted Caller Secret (optional)
+- Why: Ensure traffic originates from trusted internal callers (BFF, API Gateway, or other microservices) by requiring a shared secret header in addition to JWT.
 - Config:
-  - `ACCEPTED_SECRET`: The expected secret value. If empty, enforcement is skipped.
-  - `ACCEPTED_SECRET_HEADER`: Comma-separated header names to check (default: `Accepted-Secret,X-Accepted-Secret`).
+  - `ACCEPTED_SECRETS`: Comma-separated list of accepted secrets. If empty, enforcement is skipped.
+  - `ACCEPTED_SECRET_HEADERS`: Comma-separated header names to check. Default includes `X-Internal-Secret,Accepted-Secret,X-Accepted-Secret`.
 - Files:
-  - `app/Http/Middleware/GatewaySecret.php`: Validates the header using constant-time compare.
-  - `config/micro.php > security.gateway`: Configuration mapping for the middleware.
+  - `app/Http/Middleware/GatewaySecret.php`: Validates the header using constant-time compare against any configured secret.
+  - `config/micro.php > security.gateway`: `accepted_secrets` and `header_names` read from env.
 - Usage:
   - Add `->middleware(['gateway.secret','auth.jwt'])` to routes to require both checks.
   - Example routes provided under `/api/v1/secure-gateway/*`.
+  - Examples:
+    - Disable: `ACCEPTED_SECRETS=` (no enforcement; rely on JWT/other auth)
+    - Single: `ACCEPTED_SECRETS=secret-bff`
+    - Multiple: `ACCEPTED_SECRETS=secret-bff,secret-gateway,secret-service-x`
+    - Single header standard: `ACCEPTED_SECRET_HEADERS=X-Internal-Secret`
 
 **Resilient HTTP (Outbound)**
 - Why: External APIs fail transiently. Retries, jitter, and circuit breaker reduce user‑visible errors.

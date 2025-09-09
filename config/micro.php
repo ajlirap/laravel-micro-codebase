@@ -62,7 +62,6 @@ return [
             // Shared secret(s) expected from BFF/Gateway/other trusted services.
             // If empty, the middleware will be a no-op.
             // Supports multiple comma-separated values via ACCEPTED_SECRETS.
-            // Backwards compatible with ACCEPTED_SECRET (single value).
             'accepted_secrets' => (function () {
                 $raw = env('ACCEPTED_SECRETS', '');
                 $list = array_map('trim', explode(',', (string) $raw));
@@ -70,7 +69,7 @@ return [
             })(),
             // Standard header name preferred: 'X-Internal-Secret'.
             // You may set multiple candidates comma-separated; first match wins.
-            // Supports ACCEPTED_SECRET_HEADERS (plural) and falls back to ACCEPTED_SECRET_HEADER.
+            // Configured via ACCEPTED_SECRET_HEADERS (comma-separated).
             'header_names' => (function () {
                 $raw = env('ACCEPTED_SECRET_HEADERS', '');
                 $default = 'X-Internal-Secret,Accepted-Secret,X-Accepted-Secret';
