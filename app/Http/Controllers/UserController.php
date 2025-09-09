@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use OpenApi\Annotations as OA;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use App\Support\ApiResponse;
 use Illuminate\Validation\Rule;
 
 class UserController extends Controller
@@ -48,7 +49,7 @@ class UserController extends Controller
     public function index()
     {
         $users = User::query()->orderBy('id')->get();
-        return response()->json($users, 200);
+        return ApiResponse::success($users);
     }
 
     /**
@@ -101,7 +102,7 @@ class UserController extends Controller
         $user->password = Hash::make($validated['password']);
         $user->save();
 
-        return response()->json($user, 201);
+        return ApiResponse::success($user, null, 201);
     }
 
     /**
@@ -129,7 +130,7 @@ class UserController extends Controller
     public function show(string $id)
     {
         $user = User::query()->findOrFail((int) $id);
-        return response()->json($user, 200);
+        return ApiResponse::success($user);
     }
 
     /**
@@ -179,7 +180,7 @@ class UserController extends Controller
         }
 
         $user->save();
-        return response()->json($user, 200);
+        return ApiResponse::success($user);
     }
 
     /**

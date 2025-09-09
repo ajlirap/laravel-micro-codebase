@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use App\Support\ApiResponse;
 use App\Repositories\Contracts\ProductRepositoryInterface;
 
 /**
@@ -93,17 +94,17 @@ class ProductController extends Controller
         $limit = (int) $request->query('limit', 50);
         $limit = max(1, min(200, $limit));
         $items = $this->products->getAll($limit);
-        return response()->json($items);
+        return ApiResponse::success($items);
     }
 
     public function show(string $sku)
     {
         $product = $this->products->findBySku($sku);
         if (!$product) {
-            return response()->json(['success' => false, 'error' => ['code' => 'NOT_FOUND', 'message' => 'Product not found']], 404);
+            return ApiResponse::error('NOT_FOUND', 'Product not found', null, 404);
         }
 
-        return response()->json($product);
+        return ApiResponse::success($product);
     }
 
     public function errorDemo()
@@ -117,13 +118,7 @@ class ProductController extends Controller
                 'exception' => $e,
             ]);
 
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'DEMO_ERROR',
-                    'message' => 'A demo error was thrown and logged',
-                ],
-            ], 500);
+            return ApiResponse::error('DEMO_ERROR', 'A demo error was thrown and logged', null, 500);
         }
     }
 
@@ -136,7 +131,7 @@ class ProductController extends Controller
         ]);
 
         $created = $this->products->create($data);
-        return response()->json($created, 201);
+        return ApiResponse::success($created, null, 201);
     }
 
     public function errorUncaught()
