@@ -350,6 +350,20 @@
                 }
             }
         },
+        "/api/v1/products/error-uncaught": {
+            "get": {
+                "tags": [
+                    "Products"
+                ],
+                "summary": "Trigger an uncaught exception to see default Laravel error logging",
+                "operationId": "productErrorUncaught",
+                "responses": {
+                    "500": {
+                        "description": "Uncaught exception"
+                    }
+                }
+            }
+        },
         "/api/v1/products/{sku}": {
             "get": {
                 "tags": [

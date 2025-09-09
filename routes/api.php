@@ -22,6 +22,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/products', [ProductController::class, 'index']);
     // Place specific routes before parameterized ones
     Route::get('/products/error-demo', [ProductController::class, 'errorDemo']);
+    Route::get('/products/error-uncaught', [ProductController::class, 'errorUncaught']);
     Route::get('/products/{sku}', [ProductController::class, 'show']);
     Route::post('/products', [ProductController::class, 'store']);
 

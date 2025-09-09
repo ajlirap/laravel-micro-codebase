@@ -35,6 +35,14 @@ use App\Repositories\Contracts\ProductRepositoryInterface;
  * )
  *
  * @OA\Get(
+ *   path="/api/v1/products/error-uncaught",
+ *   operationId="productErrorUncaught",
+ *   tags={"Products"},
+ *   summary="Trigger an uncaught exception to see default Laravel error logging",
+ *   @OA\Response(response=500, description="Uncaught exception")
+ * )
+ *
+ * @OA\Get(
  *   path="/api/v1/products/{sku}",
  *   operationId="getProductBySku",
  *   tags={"Products"},
@@ -129,5 +137,11 @@ class ProductController extends Controller
 
         $created = $this->products->create($data);
         return response()->json($created, 201);
+    }
+
+    public function errorUncaught()
+    {
+        // Throw without try/catch so Laravel’s exception handler logs it
+        throw new \RuntimeException('Uncaught demo exception from ProductController::errorUncaught');
     }
 }
