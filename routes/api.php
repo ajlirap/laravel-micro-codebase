@@ -20,6 +20,8 @@ Route::prefix('v1')->group(function () {
 
     // Products API (example using repository + Swagger annotations)
     Route::get('/products', [ProductController::class, 'index']);
+    // Place specific routes before parameterized ones
+    Route::get('/products/error-demo', [ProductController::class, 'errorDemo']);
     Route::get('/products/{sku}', [ProductController::class, 'show']);
     Route::post('/products', [ProductController::class, 'store']);
 

@@ -336,6 +336,20 @@
                 }
             }
         },
+        "/api/v1/products/error-demo": {
+            "get": {
+                "tags": [
+                    "Products"
+                ],
+                "summary": "Trigger a demo error and log it (try/catch)",
+                "operationId": "productErrorDemo",
+                "responses": {
+                    "500": {
+                        "description": "Demo error intentionally thrown and logged"
+                    }
+                }
+            }
+        },
         "/api/v1/products/{sku}": {
             "get": {
                 "tags": [

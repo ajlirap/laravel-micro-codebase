@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use App\Repositories\Contracts\ProductRepositoryInterface;
 
 /**
@@ -23,6 +24,14 @@ use App\Repositories\Contracts\ProductRepositoryInterface;
  *     description="List of products",
  *     @OA\JsonContent(type="array", @OA\Items(ref="#/components/schemas/Product"))
  *   )
+ * )
+ *
+ * @OA\Get(
+ *   path="/api/v1/products/error-demo",
+ *   operationId="productErrorDemo",
+ *   tags={"Products"},
+ *   summary="Trigger a demo error and log it (try/catch)",
+ *   @OA\Response(response=500, description="Demo error intentionally thrown and logged")
  * )
  *
  * @OA\Get(
@@ -87,6 +96,27 @@ class ProductController extends Controller
         }
 
         return response()->json($product);
+    }
+
+    public function errorDemo()
+    {
+        try {
+            // Intentionally trigger an error
+            throw new \RuntimeException('Demo exception from ProductController::errorDemo');
+        } catch (\Throwable $e) {
+            Log::error('product.error_demo', [
+                'message' => $e->getMessage(),
+                'exception' => $e,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'DEMO_ERROR',
+                    'message' => 'A demo error was thrown and logged',
+                ],
+            ], 500);
+        }
     }
 
     public function store(Request $request)
