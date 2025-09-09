@@ -57,7 +57,19 @@ How To Read This File
   - Not‑before (`nbf`) test: Mint a token with future `nbf` → `401` with “not yet valid”.
 - Scopes:
   - Add middleware params like `->middleware('auth.jwt:example.read')` to a route.
-  - Token claims checked: `scope` (space‑sep), `scp` (Azure), and `roles`.
+  - Token claims checked: `scope` (space-sep), `scp` (Azure), and `roles`.
+
+API Gateway Shared Secret (optional)
+- Why: Ensure traffic comes through your API Gateway by requiring a shared secret header in addition to JWT.
+- Config:
+  - `ACCEPTED_SECRET`: The expected secret value. If empty, enforcement is skipped.
+  - `ACCEPTED_SECRET_HEADER`: Comma-separated header names to check (default: `Accepted-Secret,X-Accepted-Secret`).
+- Files:
+  - `app/Http/Middleware/GatewaySecret.php`: Validates the header using constant-time compare.
+  - `config/micro.php > security.gateway`: Configuration mapping for the middleware.
+- Usage:
+  - Add `->middleware(['gateway.secret','auth.jwt'])` to routes to require both checks.
+  - Example routes provided under `/api/v1/secure-gateway/*`.
 
 **Resilient HTTP (Outbound)**
 - Why: External APIs fail transiently. Retries, jitter, and circuit breaker reduce user‑visible errors.

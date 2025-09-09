@@ -89,6 +89,14 @@ Route::prefix('v1')->group(function () {
             ]);
         })->middleware('auth.jwt');
     });
+
+    // Secure + Gateway Secret examples
+    // These endpoints require BOTH a valid Bearer JWT and the Accepted-Secret header
+    Route::prefix('secure-gateway')->middleware(['gateway.secret','auth.jwt'])->group(function () {
+        Route::get('/ping', function () { return response()->json(['pong' => true, 'gateway' => true]); });
+        // Add additional routes here as needed, e.g.,
+        // Route::get('/users', [UserController::class, 'index']);
+    });
 });
 
 // Redirect /docs to Swagger UI

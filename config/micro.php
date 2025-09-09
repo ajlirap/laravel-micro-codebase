@@ -58,6 +58,14 @@ return [
             'prefer_exp_reason_on_failure' => env('AUTH_PREFER_EXP_REASON', false),
             'cache_ttl_seconds' => env('AUTH_CACHE_TTL_SECONDS', 3600),
         ],
+        'gateway' => [
+            // Shared secret expected from API Gateway in a header.
+            // If null/empty, the middleware will be a no-op.
+            'accepted_secret' => env('ACCEPTED_SECRET'),
+            // Header name the gateway sends. Default: 'Accepted-Secret'.
+            // You may set multiple candidates comma-separated; first match wins.
+            'header_names' => array_filter(array_map('trim', explode(',', env('ACCEPTED_SECRET_HEADER', 'Accepted-Secret,X-Accepted-Secret')))),
+        ],
         'field_encryption' => [
             // Key rotation example: keys are stored with versions, e.g., key_v1, key_v2
             // The active version is used for encryption; all versions are tried for decryption.
