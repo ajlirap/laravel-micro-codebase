@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\ApiResponse;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -9,19 +10,33 @@ class GatewaySecret
 {
     public function handle(Request $request, Closure $next)
     {
-        $expectedList = (array) config('micro.security.gateway.accepted_secrets', []);
-        if (empty($expectedList)) {
+        $expectedList = array_values(array_filter(
+            array_map('strval', (array) config('micro.security.gateway.accepted_secrets', [])),
+            fn (string $secret) => $secret !== ''
+        ));
+
+        if ($expectedList === []) {
             // Not configured: skip enforcement, but log once per process start.
             static $warned = false;
             if (!$warned) {
-                try { logger()->warning('Gateway secret not configured; skipping enforcement'); } catch (\Throwable) {}
+                try {
+                    logger()->warning('Gateway secret not configured; skipping enforcement');
+                } catch (\Throwable) {
+                    // no-op
+                }
                 $warned = true;
             }
+
             return $next($request);
         }
 
-        $headerNames = (array) config('micro.security.gateway.header_names', ['X-Internal-Secret','Accepted-Secret','X-Accepted-Secret']);
-        $provided = null; $usedHeader = null;
+        $headerNames = array_values(array_filter(
+            array_map('trim', (array) config('micro.security.gateway.header_names', ['X-Internal-Secret', 'Accepted-Secret', 'X-Accepted-Secret'])),
+            fn (string $name) => $name !== ''
+        ));
+
+        $provided = null;
+        $usedHeader = null;
         foreach ($headerNames as $name) {
             if ($request->headers->has($name)) {
                 $provided = (string) $request->headers->get($name);
@@ -38,17 +53,27 @@ class GatewaySecret
                     'ip' => $request->ip(),
                     'expected_headers' => $headerNames,
                 ]);
-            } catch (\Throwable) {}
-            return response()->json(['message' => 'Unauthorized'], 401);
+            } catch (\Throwable) {
+                // no-op
+            }
+
+            return ApiResponse::error('gateway_secret_missing', 'Unauthorized', 401);
         }
 
-        // Compare against any accepted secret. Prefer constant-time compare where available.
-        $ok = false;
+        $authorized = false;
         foreach ($expectedList as $expected) {
-            $ok = $ok || (function_exists('hash_equals') ? hash_equals($expected, $provided) : ($expected === $provided));
-            if ($ok) break;
+            if (function_exists('hash_equals')) {
+                if (hash_equals($expected, $provided)) {
+                    $authorized = true;
+                    break;
+                }
+            } elseif ($expected === $provided) {
+                $authorized = true;
+                break;
+            }
         }
-        if (!$ok) {
+
+        if (!$authorized) {
             try {
                 logger()->warning('Gateway secret mismatch', [
                     'path' => $request->path(),
@@ -57,8 +82,11 @@ class GatewaySecret
                     'used_header' => $usedHeader,
                     'accepted_count' => count($expectedList),
                 ]);
-            } catch (\Throwable) {}
-            return response()->json(['message' => 'Unauthorized'], 401);
+            } catch (\Throwable) {
+                // no-op
+            }
+
+            return ApiResponse::error('gateway_secret_invalid', 'Unauthorized', 401);
         }
 
         return $next($request);
