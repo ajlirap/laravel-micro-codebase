@@ -1,10 +1,12 @@
 <?php
 
 return [
+    // Tracing / Correlation IDs
     'tracing' => [
-        'propagate_w3c' => env('TRACE_PROPAGATE_W3C', true),
-        'request_id_header' => env('TRACE_HEADER_REQUEST_ID', 'X-Request-Id'),
-        'correlation_id_header' => env('TRACE_HEADER_CORRELATION_ID', 'X-Correlation-Id'),
+        'correlation_id_header' => env('TRACE_CORRELATION_HEADER', 'X-Correlation-Id'),
+        'request_id_header'     => env('TRACE_REQUEST_HEADER', 'X-Request-Id'),
+        'traceparent_header'    => env('TRACE_TRACEPARENT_HEADER', 'traceparent'),
+        'tracestate_header'     => env('TRACE_TRACESTATE_HEADER', 'tracestate'),
     ],
 
     'http' => [

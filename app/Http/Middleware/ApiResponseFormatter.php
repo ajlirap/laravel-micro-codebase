@@ -2,10 +2,13 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\ApiResponse;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ApiResponseFormatter
 {
@@ -14,110 +17,200 @@ class ApiResponseFormatter
         /** @var Response $response */
         $response = $next($request);
 
-        // Only format API JSON responses (both success and failure). Skip 204 and non-JSON.
-        $isApi = $request->is('api/*');
+        if (!$this->shouldFormat($request, $response)) {
+            return $response;
+        }
+
         $status = $response->getStatusCode();
-        $is2xx = $status >= 200 && $status < 300;
-        $isNoContent = $status === 204;
-
-        if (!$isApi || $isNoContent) {
+        if ($status === Response::HTTP_NO_CONTENT || $status === Response::HTTP_RESET_CONTENT) {
             return $response;
         }
 
-        // Ensure we only wrap JSON responses
-        $contentType = $response->headers->get('Content-Type');
-        $isJson = $response instanceof JsonResponse || ($contentType && str_contains(strtolower($contentType), 'application/json'));
-        if (!$isJson) {
+        $extraction = $this->extractPayload($response);
+        if (!$extraction['ok']) {
             return $response;
         }
 
-        // Extract data as array
-        $data = null;
-        if ($response instanceof JsonResponse) {
-            $data = $response->getData(true);
+        $payload = $extraction['payload'];
+
+        if (ApiResponse::isEnveloped($payload)) {
+            $this->ensureJsonHeaders($response);
+            return $response;
+        }
+
+        if ($status >= 200 && $status < 300) {
+            [$data, $message, $meta] = $this->normalizeSuccess($payload);
+            $envelope = ApiResponse::wrapSuccess($data, $message, $meta);
         } else {
-            $decoded = json_decode((string) $response->getContent(), true);
-            if (json_last_error() === JSON_ERROR_NONE) {
-                $data = $decoded;
-            }
+            [$message, $details, $code] = $this->normalizeError($payload);
+            $envelope = ApiResponse::wrapError(
+                status: $status,
+                code: $code,
+                message: $message,
+                details: $details
+            );
         }
 
-        if (!is_array($data)) {
-            return $response; // don't change if unknown structure
-        }
-
-        // Avoid double wrapping if already standardized
-        if (array_key_exists('success', $data) && (array_key_exists('data', $data) || array_key_exists('error', $data))) {
-            return $response;
-        }
-
-        // Success path: wrap as { success: true, data }
-        if ($is2xx) {
-            $wrapped = [
-                'success' => true,
-                'data' => $data,
-            ];
-            // Keep message if controller set it
-            if (array_key_exists('message', $data) && is_string($data['message'])) {
-                $wrapped['message'] = $data['message'];
-            }
-
-            if ($response instanceof JsonResponse) {
-                $response->setData($wrapped);
-            } else {
-                $response->setContent(json_encode($wrapped));
-                $response->headers->set('Content-Type', 'application/json');
-            }
-            return $response;
-        }
-
-        // Error path: wrap as { success: false, error: { code, message, details? }, traceId? }
-        $code = match ($status) {
-            400 => 'BAD_REQUEST',
-            401 => 'UNAUTHORIZED',
-            403 => 'FORBIDDEN',
-            404 => 'NOT_FOUND',
-            409 => 'CONFLICT',
-            422 => 'VALIDATION_ERROR',
-            default => 'HTTP_ERROR',
-        };
-
-        $message = is_string($data['message'] ?? null) ? $data['message'] : match ($status) {
-            400 => 'Bad request',
-            401 => 'Unauthorized',
-            403 => 'Forbidden',
-            404 => 'Resource not found',
-            409 => 'Conflict',
-            422 => 'Validation failed',
-            default => 'HTTP Error',
-        };
-
-        $details = null;
-        if (isset($data['errors']) && is_array($data['errors'])) {
-            $details = $data['errors'];
-        }
-
-        $wrapped = [
-            'success' => false,
-            'error' => [
-                'code' => $code,
-                'message' => $message,
-            ],
-        ];
-        if (!is_null($details)) {
-            $wrapped['error']['details'] = $details;
-        }
-        if (app()->bound('correlation_id')) {
-            $wrapped['traceId'] = app('correlation_id');
-        }
-
-        if ($response instanceof JsonResponse) {
-            $response->setData($wrapped);
-        } else {
-            $response->setContent(json_encode($wrapped));
-            $response->headers->set('Content-Type', 'application/json');
-        }
+        $this->applyEnvelope($response, $envelope);
 
         return $response;
+    }
+
+    private function shouldFormat(Request $request, Response $response): bool
+    {
+        if ($response instanceof BinaryFileResponse || $response instanceof StreamedResponse) {
+            return false;
+        }
+
+        $isApi = $request->is('api/*') || $request->expectsJson();
+        if (!$isApi) {
+            return false;
+        }
+
+        if ($response instanceof JsonResponse) {
+            return true;
+        }
+
+        $contentType = strtolower((string) $response->headers->get('Content-Type', ''));
+        if ($contentType === '') {
+            return false;
+        }
+
+        return str_contains($contentType, 'json');
+    }
+
+    private function extractPayload(Response $response): array
+    {
+        if ($response instanceof JsonResponse) {
+            return ['ok' => true, 'payload' => $response->getData(true)];
+        }
+
+        $content = $response->getContent();
+        if ($content === null || $content === '') {
+            return ['ok' => true, 'payload' => null];
+        }
+
+        $decoded = json_decode($content, true);
+        if (json_last_error() === JSON_ERROR_NONE) {
+            return ['ok' => true, 'payload' => $decoded];
+        }
+
+        return ['ok' => false, 'payload' => null];
+    }
+
+    private function normalizeSuccess(mixed $payload): array
+    {
+        $message = null;
+        $meta = [];
+
+        if (is_array($payload)) {
+            $data = $payload;
+
+            if (array_key_exists('message', $data) && is_string($data['message'])) {
+                $message = $data['message'];
+                unset($data['message']);
+            }
+
+            if (array_key_exists('meta', $data) && is_array($data['meta'])) {
+                $meta = $data['meta'];
+                unset($data['meta']);
+            }
+
+            if ($data === []) {
+                $data = null;
+            }
+
+            return [$data, $message, $meta];
+        }
+
+        return [$payload, $message, $meta];
+    }
+
+    private function normalizeError(mixed $payload): array
+    {
+        $message = null;
+        $details = null;
+        $code = null;
+
+        if (is_array($payload)) {
+            if (isset($payload['error']) && is_array($payload['error'])) {
+                $inner = $payload['error'];
+                if (isset($inner['code']) && is_scalar($inner['code'])) {
+                    $code = (string) $inner['code'];
+                }
+                if (isset($inner['message']) && is_string($inner['message'])) {
+                    $message = $inner['message'];
+                }
+                if (array_key_exists('details', $inner)) {
+                    $details = $inner['details'];
+                } else {
+                    $extra = array_diff_key($inner, array_flip(['code', 'message', 'details']));
+                    if (!empty($extra)) {
+                        $details = $extra;
+                    }
+                }
+                return [$message, $details, $code];
+            }
+
+            $data = $payload;
+            $usedKeys = [];
+
+            if (isset($data['code']) && is_scalar($data['code'])) {
+                $code = (string) $data['code'];
+                $usedKeys[] = 'code';
+            }
+
+            if (isset($data['message']) && is_string($data['message'])) {
+                $message = $data['message'];
+                $usedKeys[] = 'message';
+            }
+
+            if ($message === null && isset($data['detail']) && is_string($data['detail'])) {
+                $message = $data['detail'];
+                $usedKeys[] = 'detail';
+            }
+
+            if ($message === null && isset($data['title']) && is_string($data['title'])) {
+                $message = $data['title'];
+                $usedKeys[] = 'title';
+            }
+
+            if ($message === null && isset($data['error']) && is_scalar($data['error'])) {
+                $message = (string) $data['error'];
+                $usedKeys[] = 'error';
+            }
+
+            $details = array_diff_key($data, array_flip($usedKeys));
+            if ($details === []) {
+                $details = null;
+            }
+        } elseif (is_string($payload) && $payload !== '') {
+            $message = $payload;
+        }
+
+        return [$message, $details, $code];
+    }
+
+    private function applyEnvelope(Response $response, array $payload): void
+    {
+        if ($response instanceof JsonResponse) {
+            $response->setData($payload);
+            $this->ensureJsonHeaders($response);
+            return;
+        }
+
+        $response->setContent($this->encode($payload));
+        $this->ensureJsonHeaders($response);
+        $response->headers->remove('Content-Length');
+    }
+
+    private function ensureJsonHeaders(Response $response): void
+    {
+        $response->headers->set('Content-Type', 'application/json');
+    }
+
+    private function encode(array $payload): string
+    {
+        return json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 }
