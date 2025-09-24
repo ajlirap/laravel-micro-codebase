@@ -114,6 +114,7 @@ Trusted Caller Secret (optional)
 - Metrics: `GET /api/v1/metrics` returns Prometheus exposition format (scraped by Prometheus, visualized in Grafana) using the in‑memory registry from `AppServiceProvider`.
 - Logs & Correlation:
   - Correlation IDs propagate via headers; JSON logs include correlation context.
+  - App\Http\Middleware\CorrelationId emits correlation/request IDs and W3C trace headers (traceparent/tracestate) on every response; override header names with TRACE_CORRELATION_HEADER, TRACE_REQUEST_HEADER, TRACE_TRACEPARENT_HEADER, TRACE_TRACESTATE_HEADER.
   - Customize formatters/handlers in `config/logging.php`.
 
 **Feature Flags**
@@ -431,6 +432,7 @@ Database
     - `{context}`: optional JSON-encoded context appended when present.
   - Use: `Log::emergency|alert|critical|error|warning|notice|info|debug()`.
   - Implementation: `App\Logging\TapJsonFormatter` selects JSON vs line and attaches correlation extras.
+  - Trace headers: App\Http\Middleware\CorrelationId issues correlation/request IDs, respects inbound W3C traceparent/tracestate, and replays them on responses; override header names with TRACE_CORRELATION_HEADER, TRACE_REQUEST_HEADER, TRACE_TRACEPARENT_HEADER, TRACE_TRACESTATE_HEADER; App\Support\Http\ResilientHttpClient forwards the correlation/request IDs on outbound calls.
   - Tip: set `APP_TIMEZONE` for correct offset, and keep `LOG_LEVEL=info` (or `warning`) in production to reduce noise.
   - Request/Response logging:
     - Enabled globally for API routes via middleware `App\Http\Middleware\RequestResponseLogger`.
@@ -440,6 +442,13 @@ Database
       - `LOG_HTTP_RESPONSE_BODY=false` (log small textual response bodies)
       - `LOG_HTTP_MAX_BODY=2048` (max bytes to log for bodies)
     - Each request logs `http.request` with method, path, headers (safely redacted), and optional body; response logs `http.response` with status and duration_ms.
+
+**API Responses (Envelope)**
+- Middleware `App\Http\Middleware\ApiResponseFormatter` wraps JSON responses for API routes into a consistent { "success": ... } envelope unless you already return that shape or stream/binary content.
+- Success responses become { "success": true, "data": ..., "message": "...", "meta": {...} }; omit "message"/"meta" by leaving them null.
+- Errors become { "success": false, "error": { "code": "...", "message": "...", "details": ..., "traceId": "...", "correlationId": "...", "spanId": "...", "traceParent": "...", "traceState": "..." } }; identifiers appear when the CorrelationId middleware has context.
+- Use `App\Support\ApiResponse::success()` / `App\Support\ApiResponse::error()` or the `response()->success()` / `response()->error()` macros to build responses manually.
+- To opt out, return a non-JSON response or pre-wrapped payload via `ApiResponse::wrapSuccess()` / `ApiResponse::wrapError()`.
 
 **OpenAPI / Swagger (How-To)**
 - Generate docs/UI:
