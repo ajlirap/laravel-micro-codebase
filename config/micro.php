@@ -44,6 +44,11 @@ return [
                 'retries' => env('EXAMPLE_API_RETRIES', 2),
                 'scopes' => env('EXAMPLE_API_SCOPES'),
             ],
+            'identity' => [
+                'base_url' => env('IDENTITY_API_BASE_URL'),
+                'timeout_ms' => env('IDENTITY_API_TIMEOUT_MS', 1500),
+                'retries' => env('IDENTITY_API_RETRIES', 2),
+            ],
         ],
     ],
 

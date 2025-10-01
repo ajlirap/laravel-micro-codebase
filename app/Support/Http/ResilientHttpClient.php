@@ -4,6 +4,7 @@ namespace App\Support\Http;
 
 use Closure;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
@@ -68,10 +69,22 @@ class ResilientHttpClient
         $max = (int) ($this->config['retry_max_ms'] ?? 1500);
         $useJitter = (bool) ($this->config['jitter'] ?? true);
 
-        $retryDecider = function ($exception, $request, $response) {
-            if ($exception) return true;
-            if (!$response) return true;
-            return $response->serverError() || $response->status() == 429;
+        $retryDecider = function ($exception, ...$_) {
+            if ($exception instanceof Response) {
+                return $exception->serverError() || $exception->status() === 429;
+            }
+
+            if ($exception instanceof RequestException) {
+                $response = $exception->response;
+
+                if ($response instanceof Response) {
+                    return $response->serverError() || $response->status() === 429;
+                }
+
+                return true;
+            }
+
+            return $exception !== null;
         };
 
         $pending = $pending->retry(
