@@ -2,7 +2,6 @@
 
 namespace App\Clients;
 
-use App\Support\ApiResponse;
 use App\Support\Http\ResilientHttpClient;
 
 class IdentityApiClient
