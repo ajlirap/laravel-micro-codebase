@@ -2,6 +2,7 @@
 
 namespace App\Exceptions;
 
+use App\Support\ApiResponse;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -28,25 +29,20 @@ class ApiExceptionRenderer
             return null; // use default
         }
 
-        $traceId = app()->bound('correlation_id') ? app('correlation_id') : (app()->bound('request_id') ? app('request_id') : null);
-
         [$status, $code, $message, $details] = self::map($e);
 
-        $body = [
-            'success' => false,
-            'error' => [
-                'code' => $code,
-                'message' => $message,
-            ],
-        ];
-        if (!is_null($details)) {
-            $body['error']['details'] = $details;
-        }
-        if ($traceId) {
-            $body['traceId'] = $traceId;
+        $payload = ApiResponse::wrapError(
+            status: $status,
+            code: $code,
+            message: $message,
+            details: $details,
+        );
+
+        if (isset($payload['error']['traceId'])) {
+            $payload['traceId'] = $payload['error']['traceId'];
         }
 
-        return response()->json($body, $status);
+        return response()->json($payload, $status);
     }
 
     protected static function map(Throwable $e): array
