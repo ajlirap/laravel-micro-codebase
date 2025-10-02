@@ -2,7 +2,6 @@
 
 namespace App\Support\Http;
 
-use Closure;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
