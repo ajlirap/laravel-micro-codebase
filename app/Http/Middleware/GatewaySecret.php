@@ -12,7 +12,7 @@ class GatewaySecret
     {
         $expectedList = array_values(array_filter(
             array_map('strval', (array) config('micro.security.gateway.accepted_secrets', [])),
-            fn (string $secret) => $secret !== ''
+            fn(string $secret) => $secret !== ''
         ));
 
         if ($expectedList === []) {
@@ -32,7 +32,7 @@ class GatewaySecret
 
         $headerNames = array_values(array_filter(
             array_map('trim', (array) config('micro.security.gateway.header_names', ['X-Internal-Secret', 'Accepted-Secret', 'X-Accepted-Secret'])),
-            fn (string $name) => $name !== ''
+            fn(string $name) => $name !== ''
         ));
 
         $provided = null;

@@ -21,7 +21,7 @@ class RequestResponseLogger
 
         $reqCtx = [
             'method' => $request->getMethod(),
-            'path' => '/'.$request->path(),
+            'path' => '/' . $request->path(),
             'ip' => $request->ip(),
             'query' => $request->query(),
             'user_agent' => $request->userAgent(),
@@ -39,7 +39,8 @@ class RequestResponseLogger
                 if ($raw !== '') {
                     $reqCtx['body'] = $this->truncate($raw, $maxBody);
                 }
-            } catch (\Throwable) {}
+            } catch (\Throwable) {
+            }
         }
 
         Log::channel('http')->info('http.request', $reqCtx);
@@ -49,7 +50,7 @@ class RequestResponseLogger
         $durationMs = (int) round((microtime(true) - $start) * 1000);
         $resCtx = [
             'method' => $request->getMethod(),
-            'path' => '/'.$request->path(),
+            'path' => '/' . $request->path(),
             'status' => $response->getStatusCode(),
             'duration_ms' => $durationMs,
             'response_length' => $response->headers->get('Content-Length') ?? strlen((string) $response->getContent()),
@@ -60,7 +61,8 @@ class RequestResponseLogger
         if ($logResBody && $this->isTextual($response->headers->get('Content-Type'))) {
             try {
                 $resCtx['body'] = $this->truncate((string) $response->getContent(), $maxBody);
-            } catch (\Throwable) {}
+            } catch (\Throwable) {
+            }
         }
 
         Log::channel('http')->info('http.response', $resCtx);
@@ -70,7 +72,7 @@ class RequestResponseLogger
 
     private function sanitizeHeaders(array $headers): array
     {
-        $redact = ['authorization','cookie','set-cookie','x-api-key'];
+        $redact = ['authorization', 'cookie', 'set-cookie', 'x-api-key'];
         $out = [];
         foreach ($headers as $k => $v) {
             $lk = strtolower($k);

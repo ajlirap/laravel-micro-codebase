@@ -6,7 +6,6 @@ use App\Support\Auth\JwksProvider;
 use Closure;
 use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
 use Firebase\JWT\ExpiredException;
 use Firebase\JWT\BeforeValidException;
 use Firebase\JWT\SignatureInvalidException;
@@ -28,7 +27,8 @@ class JwtAuthenticate
                     'auth_header_present' => $request->headers->has('Authorization'),
                     // Do NOT log full header/token for security; headers can still confirm presence/casing issues
                 ]);
-            } catch (\Throwable) {}
+            } catch (\Throwable) {
+            }
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
@@ -39,7 +39,10 @@ class JwtAuthenticate
             $header = json_decode(JWT::urlsafeB64Decode($parts[0]), true);
             $kid = $header['kid'] ?? null;
             $claimsUnverified = [];
-            try { $claimsUnverified = json_decode(JWT::urlsafeB64Decode($parts[1] ?? ''), true) ?: []; } catch (\Throwable) {}
+            try {
+                $claimsUnverified = json_decode(JWT::urlsafeB64Decode($parts[1] ?? ''), true) ?: [];
+            } catch (\Throwable) {
+            }
 
             // Config
             $accepted = config('micro.security.jwt.accepted_algs', ['RS256']);
@@ -47,27 +50,41 @@ class JwtAuthenticate
             $audCfg = (string) config('micro.security.jwt.expected_aud');
             $leeway = (int) config('micro.security.jwt.leeway_seconds', 0);
             $preferExp = (bool) config('micro.security.jwt.prefer_exp_reason_on_failure', false);
-            if ($leeway > 0) { JWT::$leeway = $leeway; }
+            if ($leeway > 0) {
+                JWT::$leeway = $leeway;
+            }
 
             // Enforce allowed algorithms from config
             $alg = $header['alg'] ?? null;
-            try { logger()->debug('JWT header parsed', [ 'alg' => $alg, 'kid' => $kid, 'accepted_algs' => $accepted ]); } catch (\Throwable) {}
+            try {
+                logger()->debug('JWT header parsed', ['alg' => $alg, 'kid' => $kid, 'accepted_algs' => $accepted]);
+            } catch (\Throwable) {
+            }
             if ($alg && !in_array($alg, (array) $accepted, true)) {
-                try { logger()->warning('JWT algorithm not accepted', [ 'alg' => $alg, 'accepted_algs' => $accepted ]); } catch (\Throwable) {}
+                try {
+                    logger()->warning('JWT algorithm not accepted', ['alg' => $alg, 'accepted_algs' => $accepted]);
+                } catch (\Throwable) {
+                }
                 throw new \RuntimeException('Algorithm not accepted');
             }
 
             $keys = $this->jwks->getKeys();
             if (empty($keys)) {
-                try { logger()->warning('JWKS empty or not fetched'); } catch (\Throwable) {}
+                try {
+                    logger()->warning('JWKS empty or not fetched');
+                } catch (\Throwable) {
+                }
                 throw new \RuntimeException('No JWKS keys available');
             }
 
             // Ensure each JWK has a usable "kid"; fall back to x5t/x5t#S256 when missing.
             $keys = array_map(static function ($k) {
                 if (is_array($k) && !isset($k['kid'])) {
-                    if (isset($k['x5t'])) { $k['kid'] = (string) $k['x5t']; }
-                    elseif (isset($k['x5t#S256'])) { $k['kid'] = (string) $k['x5t#S256']; }
+                    if (isset($k['x5t'])) {
+                        $k['kid'] = (string) $k['x5t'];
+                    } elseif (isset($k['x5t#S256'])) {
+                        $k['kid'] = (string) $k['x5t#S256'];
+                    }
                 }
                 return $k;
             }, $keys);
@@ -82,7 +99,8 @@ class JwtAuthenticate
                     'kids' => array_values(array_filter(array_map(static fn($k) => is_array($k) ? ($k['kid'] ?? null) : null, $keys))),
                     'default_alg' => $defaultAlg,
                 ]);
-            } catch (\Throwable) {}
+            } catch (\Throwable) {
+            }
 
             // Track auth error context for client header
             $errorReason = 'invalid_token';
@@ -95,21 +113,36 @@ class JwtAuthenticate
                 $fallbackTried = false;
                 if ($kid && !isset($jwks[$kid])) {
                     $fallbackTried = true;
-                    try { logger()->debug('Attempting kid fallback lookup', [ 'kid' => $kid ]); } catch (\Throwable) {}
+                    try {
+                        logger()->debug('Attempting kid fallback lookup', ['kid' => $kid]);
+                    } catch (\Throwable) {
+                    }
                     $match = null;
                     foreach ($keys as $k) {
-                        if (!is_array($k)) { continue; }
+                        if (!is_array($k)) {
+                            continue;
+                        }
                         $cands = [];
-                        foreach (['kid','x5t','x5t#S256'] as $f) { if (isset($k[$f])) { $cands[] = (string) $k[$f]; } }
+                        foreach (['kid', 'x5t', 'x5t#S256'] as $f) {
+                            if (isset($k[$f])) {
+                                $cands[] = (string) $k[$f];
+                            }
+                        }
                         $lower = array_map('strtolower', $cands);
-                        if (in_array($kid, $cands, true) || in_array(strtolower($kid), $lower, true)) { $match = $k; break; }
+                        if (in_array($kid, $cands, true) || in_array(strtolower($kid), $lower, true)) {
+                            $match = $k;
+                            break;
+                        }
                     }
                     if ($match) {
                         try {
                             $singleKey = JWK::parseKey($match, $alg ?: $defaultAlg);
                             $decoded = JWT::decode($token, $singleKey);
                         } catch (\Throwable $inner) {
-                            try { logger()->warning('JWT fallback decode failed', [ 'error' => $inner->getMessage(), 'kid' => $kid ]); } catch (\Throwable) {}
+                            try {
+                                logger()->warning('JWT fallback decode failed', ['error' => $inner->getMessage(), 'kid' => $kid]);
+                            } catch (\Throwable) {
+                            }
                             // classify error and attach context before rethrow
                             if ($inner instanceof ExpiredException) {
                                 $errorReason = 'invalid_token';
@@ -193,7 +226,8 @@ class JwtAuthenticate
                             'claims_iss' => $claimsUnverified['iss'] ?? null,
                             'claims_aud' => $claimsUnverified['aud'] ?? null,
                         ]);
-                    } catch (\Throwable) {}
+                    } catch (\Throwable) {
+                    }
                     // Attach error context for outer catch via container
                     app()->instance('jwt_last_error_context', [
                         'error_reason' => $errorReason,
@@ -218,7 +252,8 @@ class JwtAuthenticate
                     'scope' => $claims['scope'] ?? null,
                     'roles' => $claims['roles'] ?? null,
                 ]);
-            } catch (\Throwable) {}
+            } catch (\Throwable) {
+            }
             // Expected issuers: support comma-separated list and tolerate trailing slash differences (AAD B2C)
             $issList = array_filter(array_map('trim', explode(',', $issCfg)));
             if (!empty($issList)) {
@@ -227,12 +262,16 @@ class JwtAuthenticate
                 $ok = false;
                 foreach ($issList as $iss) {
                     $issNorm = rtrim($iss, '/');
-                    if ($claimIss === $iss || $claimIss === $iss.'/' || $claimIssNorm === $issNorm) {
-                        $ok = true; break;
+                    if ($claimIss === $iss || $claimIss === $iss . '/' || $claimIssNorm === $issNorm) {
+                        $ok = true;
+                        break;
                     }
                 }
                 if (!$ok) {
-                    try { logger()->warning('JWT issuer mismatch', [ 'claim_iss' => $claimIss, 'expected_iss' => $issList ]); } catch (\Throwable) {}
+                    try {
+                        logger()->warning('JWT issuer mismatch', ['claim_iss' => $claimIss, 'expected_iss' => $issList]);
+                    } catch (\Throwable) {
+                    }
                     throw new \RuntimeException('Issuer mismatch');
                 }
             }
@@ -244,10 +283,16 @@ class JwtAuthenticate
                 $claimAud = is_array($claimAudRaw) ? $claimAudRaw : [(string) $claimAudRaw];
                 $ok = false;
                 foreach ($audList as $expectedAud) {
-                    if (in_array($expectedAud, $claimAud, true)) { $ok = true; break; }
+                    if (in_array($expectedAud, $claimAud, true)) {
+                        $ok = true;
+                        break;
+                    }
                 }
                 if (!$ok) {
-                    try { logger()->warning('JWT audience mismatch', [ 'claim_aud' => $claimAud, 'expected_aud' => $audList ]); } catch (\Throwable) {}
+                    try {
+                        logger()->warning('JWT audience mismatch', ['claim_aud' => $claimAud, 'expected_aud' => $audList]);
+                    } catch (\Throwable) {
+                    }
                     throw new \RuntimeException('Audience mismatch');
                 }
             }
@@ -274,14 +319,17 @@ class JwtAuthenticate
                 // Optional: treat app roles as scopes
                 if (isset($claims['roles'])) {
                     $roles = $claims['roles'];
-                    $tokenScopes = array_merge($tokenScopes, is_array($roles) ? $roles : [ (string) $roles ]);
+                    $tokenScopes = array_merge($tokenScopes, is_array($roles) ? $roles : [(string) $roles]);
                 }
                 // Normalize uniques
                 $tokenScopes = array_values(array_unique(array_map('trim', $tokenScopes)));
 
                 foreach ($requiredScopes as $required) {
                     if (!in_array($required, $tokenScopes, true)) {
-                        try { logger()->warning('JWT missing required scope', [ 'required' => $required, 'token_scopes' => $tokenScopes ]); } catch (\Throwable) {}
+                        try {
+                            logger()->warning('JWT missing required scope', ['required' => $required, 'token_scopes' => $tokenScopes]);
+                        } catch (\Throwable) {
+                        }
                         return response()->json(['message' => 'Forbidden'], 403);
                     }
                 }
@@ -292,13 +340,14 @@ class JwtAuthenticate
         } catch (\Throwable $e) {
             // Avoid leaking details to clients; log for server diagnostics.
             try {
-                logger()->warning('JWT auth failed', [ 'error' => $e->getMessage(), 'path' => $request->path(), 'method' => $request->method() ]);
-            } catch (\Throwable) {}
+                logger()->warning('JWT auth failed', ['error' => $e->getMessage(), 'path' => $request->path(), 'method' => $request->method()]);
+            } catch (\Throwable) {
+            }
             // RFC 6750: include WWW-Authenticate header with reason
             $ctx = app()->bound('jwt_last_error_context') ? app('jwt_last_error_context') : [];
             $reason = is_array($ctx) && isset($ctx['error_reason']) ? (string) $ctx['error_reason'] : 'invalid_token';
             $desc = is_array($ctx) && isset($ctx['error_description']) ? (string) $ctx['error_description'] : 'JWT validation failed';
-            $www = 'Bearer realm="api", error="'.$reason.'", error_description="'.str_replace('"', '\"', $desc).'"';
+            $www = 'Bearer realm="api", error="' . $reason . '", error_description="' . str_replace('"', '\"', $desc) . '"';
 
             $body = ['message' => 'Unauthorized'];
             if (config('app.debug')) {

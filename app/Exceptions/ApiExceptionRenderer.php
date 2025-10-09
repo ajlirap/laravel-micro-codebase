@@ -11,6 +11,7 @@ use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response as HttpResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\Exception\BadRequestException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
 
@@ -53,15 +54,26 @@ class ApiExceptionRenderer
         $details = null;
 
         if ($e instanceof ValidationException) {
-            $status = 422; $code = 'VALIDATION_ERROR';
+            $status = 422;
+            $code = 'VALIDATION_ERROR';
             $message = 'Validation failed';
             $details = $e->errors();
+        } elseif ($e instanceof BadRequestException) {
+            $status = 400;
+            $code = 'BAD_REQUEST';
+            $message = $e->getMessage() ?: 'Invalid application payload';
         } elseif ($e instanceof AuthenticationException) {
-            $status = 401; $code = 'UNAUTHORIZED'; $message = 'Unauthorized';
+            $status = 401;
+            $code = 'UNAUTHORIZED';
+            $message = 'Unauthorized';
         } elseif ($e instanceof AuthorizationException) {
-            $status = 403; $code = 'FORBIDDEN'; $message = 'Forbidden';
+            $status = 403;
+            $code = 'FORBIDDEN';
+            $message = 'Forbidden';
         } elseif ($e instanceof ModelNotFoundException) {
-            $status = 404; $code = 'NOT_FOUND'; $message = 'Resource not found';
+            $status = 404;
+            $code = 'NOT_FOUND';
+            $message = 'Resource not found';
         } elseif ($e instanceof ConnectionException) {
             $status = 503;
             $code = 'SERVICE_UNAVAILABLE';
@@ -96,6 +108,25 @@ class ApiExceptionRenderer
                 $status = 502;
                 $code = 'BAD_GATEWAY';
                 $message = 'Received an invalid response from upstream service';
+            }
+        } elseif ($e instanceof ProviderRequestException) {
+            $status = $e->statusCode ?? 502;
+            $code = self::defaultCodeFor($status);
+            $message = $e->getMessage();
+
+            if (isset($e->context['body'])) {
+                if (is_string($e->context['body']) && trim($e->context['body']) !== '') {
+                    // surface upstream body so clients can diagnose payload issues
+                    $details = ['providerResponse' => $e->context['body']];
+                } elseif (is_array($e->context['body'])) {
+                    $details = ['providerResponse' => $e->context['body']];
+                }
+            } elseif (!empty($e->context)) {
+                $details = $e->context;
+            }
+
+            if ($status === 502 && $code === 'HTTP_ERROR') {
+                $code = 'BAD_GATEWAY';
             }
         } elseif ($e instanceof HttpExceptionInterface) {
             $status = $e->getStatusCode();
@@ -136,4 +167,3 @@ class ApiExceptionRenderer
         };
     }
 }
-

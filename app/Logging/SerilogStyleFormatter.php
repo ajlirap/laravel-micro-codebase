@@ -27,7 +27,8 @@ class SerilogStyleFormatter implements FormatterInterface
             $contextOut = ' ' . $this->toInlineJson($record->context);
         }
 
-        return sprintf('[%s|%s|%s|%s] %s%s%s',
+        return sprintf(
+            '[%s|%s|%s|%s] %s%s%s',
             $dt,
             $levelShort,
             $corrBlock,
@@ -69,7 +70,9 @@ class SerilogStyleFormatter implements FormatterInterface
         // Prevent logging extremely large payloads
         try {
             $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            if ($json === false) { return ''; }
+            if ($json === false) {
+                return '';
+            }
             // Clamp size to ~4KB for safety
             if (strlen($json) > 4096) {
                 $json = substr($json, 0, 4093) . '...';
@@ -80,4 +83,3 @@ class SerilogStyleFormatter implements FormatterInterface
         }
     }
 }
-
