@@ -6,6 +6,7 @@ use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MetricsController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ProductController;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 
 // Versioned API routes
 Route::prefix('v1')->group(function () {
@@ -92,13 +93,24 @@ Route::prefix('v1')->group(function () {
 
     // Secure + Gateway Secret examples
     // These endpoints require BOTH a valid Bearer JWT and the Accepted-Secret header
-    Route::prefix('secure-gateway')->middleware(['gateway.secret','auth.jwt'])->group(function () {
-        Route::get('/ping', function () { return response()->json(['pong' => true, 'gateway' => true]); });
+    Route::prefix('secure-gateway')->middleware(['gateway.secret', 'auth.jwt'])->group(function () {
+        Route::get('/ping', function () {
+            return response()->json(['pong' => true, 'gateway' => true]);
+        });
         // Add additional routes here as needed, e.g.,
         // Route::get('/users', [UserController::class, 'index']);
     });
 });
 
+Route::middleware('web')->group(function () {
+    Route::get('/csrf-token', function (Request $request) {
+        return response()->json(['csrf_token' => csrf_token()]);
+    });
+
+    Route::post('/csrf/verify', function (Request $request) {
+        return response()->json(['message' => 'CSRF token accepted']);
+    })->middleware(VerifyCsrfToken::class);
+});
 // Redirect /docs to Swagger UI
 Route::get('/docs', function () {
     return redirect('/api/documentation');
