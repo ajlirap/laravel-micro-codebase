@@ -9,6 +9,7 @@ use App\FeatureFlags\FeatureFlagClient;
 use App\FeatureFlags\ArrayFeatureFlags;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Http;
+use App\Support\ApiResponse;
 use Psr\Http\Message\RequestInterface;
 
 class AppServiceProvider extends ServiceProvider
@@ -79,21 +80,8 @@ class AppServiceProvider extends ServiceProvider
             return Response::json($payload, $status);
         });
 
-        Response::macro('error', function (string $code, string $message, array $details = null, int $status = 400) {
-            $body = [
-                'success' => false,
-                'error' => [
-                    'code' => $code,
-                    'message' => $message,
-                ],
-            ];
-            if (!is_null($details)) {
-                $body['error']['details'] = $details;
-            }
-            if (app()->bound('correlation_id')) {
-                $body['traceId'] = app('correlation_id');
-            }
-            return Response::json($body, $status);
+        Response::macro('error', function (string $code, string $message, int $status = 400, array $details = [], array $context = []) {
+            return ApiResponse::error($code, $message, $status, $details, $context);
         });
     }
 }
