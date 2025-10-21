@@ -101,7 +101,7 @@ class ProductController extends Controller
     {
         $product = $this->products->findBySku($sku);
         if (!$product) {
-            return ApiResponse::error('NOT_FOUND', 'Product not found', null, 404);
+            return ApiResponse::error('NOT_FOUND', 'Product not found', 404);
         }
 
         return ApiResponse::success($product);
@@ -118,7 +118,7 @@ class ProductController extends Controller
                 'exception' => $e,
             ]);
 
-            return ApiResponse::error('DEMO_ERROR', 'A demo error was thrown and logged', null, 500);
+            return ApiResponse::error('DEMO_ERROR', 'A demo error was thrown and logged', 500);
         }
     }
 
