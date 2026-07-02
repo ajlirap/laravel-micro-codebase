@@ -1,9 +1,12 @@
 # syntax=docker/dockerfile:1
 
-FROM composer:2 AS vendor
+FROM php:8.3-cli-alpine AS vendor
 WORKDIR /app
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+RUN apk add --no-cache git linux-headers unzip \
+  && docker-php-ext-install sockets
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --prefer-dist --no-interaction --no-progress
+RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --no-scripts
 COPY . ./
 RUN composer dump-autoload -o
 
@@ -11,7 +14,7 @@ FROM php:8.3-fpm-alpine AS runtime
 WORKDIR /var/www/html
 
 # Install system deps and PHP extensions
-RUN apk add --no-cache icu-dev libpq-dev libzip-dev rabbitmq-c-dev oniguruma-dev git curl tzdata bash \
+RUN apk add --no-cache icu-dev libpq-dev libzip-dev rabbitmq-c-dev oniguruma-dev linux-headers git curl tzdata bash \
   && docker-php-ext-install intl pdo pdo_mysql pdo_pgsql opcache sockets
 
 # Copy project files
@@ -30,4 +33,3 @@ RUN addgroup -g 1000 app && adduser -G app -u 1000 -D app \
 USER app
 
 CMD ["php-fpm"]
-
