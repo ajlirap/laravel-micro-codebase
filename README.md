@@ -15,7 +15,7 @@ Quick Start
 > - After changing `.env`, run `php artisan config:clear && php artisan cache:clear` so Laravel reloads the new values.
 > - When using Docker, `docker-compose.yml` already points the app to `env_file: .env` for local convenience. In real deployments, pass env vars/secrets from your orchestrator instead.
 
-- Run: `php artisan serve` (or `docker-compose up -d`), open `http://localhost:8000` (or `:8080` via Docker).
+- Run: `php artisan serve` (or `docker-compose up -d`), open `http://localhost:8000` (or `:8081` via Docker).
 - Try endpoints: `GET /api/v1/health`, `GET /api/v1/metrics`, `GET /api/v1/users`.
 - Swagger UI: `GET /api/documentation` (or `/api/docs` redirect).
 
@@ -168,7 +168,7 @@ Docker Usage (All Features)
 
 Run the stack
 - Build and start: `docker compose up --build -d`
-- App (Nginx): http://localhost:8080
+- App (Nginx): http://localhost:8081
 - Logs: `docker compose logs -f app` (PHP-FPM), `docker compose logs -f web` (Nginx)
 - Tests: `docker compose exec app php artisan test`
 - Tinker REPL: `docker compose exec app php artisan tinker`
@@ -181,7 +181,7 @@ RabbitMQ
 
 OpenAPI / Swagger
 - Generate docs: `docker compose exec app php artisan l5-swagger:generate`
-- Open UI: http://localhost:8080/api/documentation
+- Open UI: http://localhost:8081/api/documentation
 
 Grafana (Monitoring)
 - Run Prometheus (scraper): `docker run -p 9090:9090 -v $PWD/prom.yml:/etc/prometheus/prometheus.yml prom/prometheus`
@@ -195,7 +195,7 @@ scrape_configs:
   - job_name: 'laravel-service'
     metrics_path: /api/v1/metrics
     static_configs:
-      - targets: ['host.docker.internal:8080']
+      - targets: ['host.docker.internal:8081']
 # If Prometheus runs in the same docker-compose network, target nginx by name:
 #   - targets: ['web:80']
 ```
@@ -219,7 +219,7 @@ JWT (Local testing)
   - `AUTH_EXPECTED_ISS=http://localhost`
   - `AUTH_EXPECTED_AUD=local-api`
 - Call a secured route with an RS256 token:
-  - `curl -i -H "Authorization: Bearer <token>" http://localhost:8080/api/v1/secure/health`
+  - `curl -i -H "Authorization: Bearer <token>" http://localhost:8081/api/v1/secure/health`
 
 Resilient HTTP demo
 - Set `EXAMPLE_API_BASE_URL=https://httpbin.org` in `.env`.
@@ -346,8 +346,8 @@ Database
   - Optional: `AUTH_ACCEPTED_ALGS=RS256`, `AUTH_LEEWAY_SECONDS=60`, `AUTH_PREFER_EXP_REASON=false`
 - Apply and test:
   - `php artisan config:clear && php artisan cache:clear`
-  - No token: `curl -i http://localhost:8080/api/v1/secure/health` → 401 with `WWW-Authenticate`
-  - Valid token: `curl -i -H "Authorization: Bearer <token>" http://localhost:8080/api/v1/secure/health` → 200
+  - No token: `curl -i http://localhost:8081/api/v1/secure/health` → 401 with `WWW-Authenticate`
+  - Valid token: `curl -i -H "Authorization: Bearer <token>" http://localhost:8081/api/v1/secure/health` → 200
 - Scopes on routes:
   - Example: `Route::get('/secure/users', ...)->middleware('auth.jwt:example.read');`
   - Token claims checked: `scope` (space‑sep), `scp` (Azure), and `roles`.
@@ -392,7 +392,7 @@ Database
 
 **Observability (How-To)**
 - Health:
-  - `curl http://localhost:8080/api/v1/health` → checks app/DB readiness.
+  - `curl http://localhost:8081/api/v1/health` → checks app/DB readiness.
   - Extend checks in `app/Http/Controllers/HealthController.php`.
 - Grafana & Prometheus:
   - Run: `docker run -p 9090:9090 -v $PWD/prom.yml:/etc/prometheus/prometheus.yml prom/prometheus`
@@ -404,7 +404,7 @@ Database
       - job_name: 'laravel-service'
         metrics_path: /api/v1/metrics
         static_configs:
-          - targets: ['host.docker.internal:8080']
+          - targets: ['host.docker.internal:8081']
     ```
   - Custom metric:
     ```php
@@ -453,7 +453,7 @@ Database
 **OpenAPI / Swagger (How-To)**
 - Generate docs/UI:
   - `docker compose exec app php artisan l5-swagger:generate`
-  - Open http://localhost:8080/api/documentation, click “Authorize” to test secured endpoints.
+  - Open http://localhost:8081/api/documentation, click “Authorize” to test secured endpoints.
 - Annotate endpoints with `@OA\Get`, `@OA\Post`, etc. Secured operations include `security={{"bearerAuth": {}}}`.
 
 **Field Encryption (How-To)**
