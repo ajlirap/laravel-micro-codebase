@@ -14,7 +14,12 @@ class ResilientHttpClientTest extends TestCase
             ->pushStatus(500)
             ->push(['ok' => true], 200);
 
-        $client = new ResilientHttpClient('example', ['base_url' => 'http://example.test', 'retries' => 2, 'timeout_ms' => 200]);
+        $client = new ResilientHttpClient('example', [
+            'base_url' => 'http://example.test',
+            'retries' => 2,
+            'timeout_ms' => 200,
+            'scopes' => [],
+        ]);
 
         $resp = $client->request('GET', '/ping');
         $this->assertTrue($resp->successful());

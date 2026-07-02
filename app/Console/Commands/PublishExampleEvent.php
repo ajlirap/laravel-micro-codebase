@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 class PublishExampleEvent extends Command
 {
     protected $signature = 'mq:publish-example {--producer=queue : queue|amqp}';
-    protected $description = 'Publish an example event to RabbitMQ (queue dispatch or AMQP publish)';
+    protected $description = 'Publish an example event to the configured queue backend';
 
     public function handle(): int
     {
@@ -21,14 +21,18 @@ class PublishExampleEvent extends Command
         ];
 
         if ($this->option('producer') === 'amqp') {
-            (new Publisher())->publish(config('queue.connections.rabbitmq.options.exchange_routing_key', 'events.example'), $payload, $headers);
-            $this->info('Published via AMQP');
+            if (config('queue.default') !== 'azure-servicebus') {
+                $this->error('Direct publish is implemented for QUEUE_CONNECTION=azure-servicebus.');
+
+                return self::FAILURE;
+            }
+            (new Publisher())->publish('events.example', $payload, $headers);
+            $this->info('Published directly via azure-servicebus');
         } else {
-            ExampleEventConsumer::dispatch($payload, $headers)->onConnection('rabbitmq');
-            $this->info('Dispatched job to rabbitmq queue');
+            ExampleEventConsumer::dispatch($payload, $headers);
+            $this->info('Dispatched job to '.config('queue.default').' queue');
         }
 
         return self::SUCCESS;
     }
 }
-

@@ -30,8 +30,11 @@ class ExampleEventConsumer implements ShouldQueue
 
     public function __construct(public array $payload, public array $headers = [])
     {
-        $this->onConnection('rabbitmq');
-        $this->onQueue(config('queue.connections.rabbitmq.queue'));
+        $connection = config('queue.default', 'database');
+        $queue = config("queue.connections.$connection.queue", config('queue.connections.azure-servicebus.queue', 'app.queue'));
+
+        $this->onConnection($connection);
+        $this->onQueue($queue);
     }
 
     public function handle(IdempotencyStore $store): void
@@ -59,4 +62,3 @@ class ExampleEventConsumer implements ShouldQueue
         ]);
     }
 }
-

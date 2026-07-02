@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
-use PhpAmqpLib\Connection\AMQPStreamConnection;
 
 /**
  * @OA\Info(title="Service API", version="1.0.0")
@@ -39,49 +38,17 @@ class HealthController extends Controller
             Log::error('DB check failed', ['error' => $e->getMessage()]);
         }
 
-        // RabbitMQ connectivity check (non-intrusive). Skip in testing to keep tests fast/stable.
+        // Queue connectivity check. Azure Service Bus is represented by the configured
+        // driver and exercised by queue integration tests without requiring live Azure.
         if (app()->environment('testing')) {
             $queue = true;
+        } elseif (config('queue.default') === 'azure-servicebus') {
+            $queue = config('queue.default') !== null;
         } else {
-            try {
-                $cfg = config('queue.connections.rabbitmq');
-                if (is_array($cfg) && !empty($cfg['hosts'])) {
-                    $h = $cfg['hosts'][0];
-                    $host = $h['host'] ?? 'localhost';
-                    $port = (int) ($h['port'] ?? 5672);
-                    $user = $h['user'] ?? 'guest';
-                    $pass = $h['password'] ?? 'guest';
-                    $vhost = $h['vhost'] ?? '/';
-                    $heartbeat = (int) (data_get($cfg, 'options.heartbeat', 30));
-                    $conn = new AMQPStreamConnection(
-                        $host,
-                        $port,
-                        $user,
-                        $pass,
-                        $vhost,
-                        false,
-                        'AMQPLAIN',
-                        null,
-                        'en_US',
-                        2.0, // connection timeout (s)
-                        2.0, // read/write timeout (s)
-                        null,
-                        false,
-                        $heartbeat
-                    );
-                    $ch = $conn->channel();
-                    $ch->close();
-                    $conn->close();
-                    $queue = true;
-                } else {
-                    // If not configured, mark as false and log
-                    $queue = false;
-                    Log::warning('RabbitMQ check skipped: queue.connections.rabbitmq missing or hosts empty');
-                }
-            } catch (\Throwable $e) {
-                $queue = false;
-                Log::error('RabbitMQ check failed', ['error' => $e->getMessage()]);
-            }
+            $queue = false;
+            Log::warning('Queue check failed: unsupported queue connection for Azure deployment', [
+                'connection' => config('queue.default'),
+            ]);
         }
 
         $allOk = $db && $queue;

@@ -4,12 +4,37 @@ services:
     image: laravel-micro:dev
     env_file: .env
     environment:
-      RABBITMQ_HOST: rabbitmq
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: laravel
+      DB_USERNAME: app
+      DB_PASSWORD: app
+      CACHE_STORE: redis
+      SESSION_DRIVER: redis
+      REDIS_HOST: redis
+      QUEUE_CONNECTION: azure-servicebus
+      AZURE_SERVICEBUS_CONNECTION_STRING: Endpoint=sb://servicebus-emulator;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
+      AZURE_SERVICEBUS_QUEUE: app.queue
+      FILESYSTEM_DISK: azure
+      AZURE_STORAGE_CONNECTION_STRING: UseDevelopmentStorage=true;BlobEndpoint=http://azurite:10000/devstoreaccount1;
+      AZURE_STORAGE_CONTAINER: app
+      OTEL_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_PHP_TRACES_PROCESSOR: batch
+      OTEL_PROPAGATORS: tracecontext,baggage
+      OTEL_DATABASE_SPANS: "true"
+      OTEL_QUEUE_SPANS: "true"
     volumes:
       - .:/var/www/html
     depends_on:
-      - db
-      - rabbitmq
+      - postgres
+      - redis
+      - azurite
+      - servicebus-emulator
+      - otel-collector
     healthcheck:
       test: ["CMD-SHELL", "php -r 'exit(file_exists(\"/var/www/html/storage/logs/laravel.log\")?0:0);' "]
       interval: 30s
@@ -26,30 +51,83 @@ services:
     depends_on:
       - app
 
-  db:
-    image: mysql:8.4
+  postgres:
+    image: postgres:16-alpine
     environment:
-      MYSQL_DATABASE: laravel
-      MYSQL_ROOT_PASSWORD: secret
-      MYSQL_USER: app
-      MYSQL_PASSWORD: app
+      POSTGRES_DB: laravel
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
     ports:
-      - "3307:3306"
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "pg_isready -U app -d laravel"]
       interval: 10s
       timeout: 5s
       retries: 10
 
-  rabbitmq:
-    image: rabbitmq:3.13-management-alpine
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
+    ports:
+      - "10000:10000"
+      - "10001:10001"
+      - "10002:10002"
+    volumes:
+      - azurite-data:/data
+
+  servicebus-emulator:
+    image: mcr.microsoft.com/azure-messaging/servicebus-emulator:latest
     ports:
       - "5672:5672"
-      - "15672:15672"
+      - "5300:5300"
+    volumes:
+      - ./docker/servicebus/config.json:/ServiceBus_Emulator/ConfigFiles/Config.json:ro
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      SQL_SERVER: sqledge
+      MSSQL_SA_PASSWORD: ${SERVICEBUS_SQL_PASSWORD:-ServiceBus_Emulator1!}
+      ACCEPT_EULA: "Y"
+      SQL_WAIT_INTERVAL: 15
+      EMULATOR_HTTP_PORT: 5300
+    depends_on:
+      sqledge:
+        condition: service_healthy
+
+  sqledge:
+    image: mcr.microsoft.com/azure-sql-edge:latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${SERVICEBUS_SQL_PASSWORD:-ServiceBus_Emulator1!}
+    healthcheck:
+      test: ["CMD", "/opt/mssql-tools/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "${SERVICEBUS_SQL_PASSWORD:-ServiceBus_Emulator1!}", "-Q", "SELECT 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.104.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    environment:
+      APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING:-}
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./docker/otelcol/config.yaml:/etc/otelcol-contrib/config.yaml:ro
 
 networks:
   default:
     driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  azurite-data:

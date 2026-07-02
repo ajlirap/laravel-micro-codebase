@@ -10,12 +10,19 @@ RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --no-
 COPY . ./
 RUN composer dump-autoload -o
 
+FROM vendor AS test
+RUN composer install --prefer-dist --no-interaction --no-progress
+RUN cp .env.example .env
+CMD ["php", "artisan", "test"]
+
 FROM php:8.3-fpm-alpine AS runtime
 WORKDIR /var/www/html
 
 # Install system deps and PHP extensions
-RUN apk add --no-cache icu-dev libpq-dev libzip-dev rabbitmq-c-dev oniguruma-dev linux-headers git curl tzdata bash \
-  && docker-php-ext-install intl pdo pdo_mysql pdo_pgsql opcache sockets
+RUN apk add --no-cache icu-dev libpq-dev libzip-dev oniguruma-dev linux-headers git curl tzdata bash $PHPIZE_DEPS \
+  && docker-php-ext-install intl pdo pdo_mysql pdo_pgsql opcache sockets \
+  && pecl install redis \
+  && docker-php-ext-enable redis
 
 # Copy project files
 COPY --from=vendor /app /var/www/html

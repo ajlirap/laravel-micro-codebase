@@ -115,6 +115,18 @@ return [
             'after_commit' => false,
         ],
 
+        'azure-servicebus' => [
+            'driver' => 'azure-servicebus',
+            'connection_string' => env('AZURE_SERVICEBUS_CONNECTION_STRING'),
+            'queue' => env('AZURE_SERVICEBUS_QUEUE', 'app.queue'),
+            'topic' => env('AZURE_SERVICEBUS_TOPIC'),
+            'subscription' => env('AZURE_SERVICEBUS_SUBSCRIPTION'),
+            'receive_timeout' => (int) env('AZURE_SERVICEBUS_RECEIVE_TIMEOUT', 30),
+            'sas_ttl' => (int) env('AZURE_SERVICEBUS_SAS_TTL', 3600),
+            'retry_after' => (int) env('AZURE_SERVICEBUS_RETRY_AFTER', 90),
+            'after_commit' => false,
+        ],
+
     ],
 
     /*
