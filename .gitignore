@@ -21,3 +21,18 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Aspire (.NET) build and IDE files
+aspire/**/bin/
+aspire/**/obj/
+aspire/**/publish/
+aspire/**/.vs/
+aspire/.vs/
+aspire/**/*.user
+aspire/**/*.suo
+aspire/**/*.nupkg
+# Local appsettings and secrets
+aspire/**/appsettings.*.json
+
+# Local Composer cache used by Codex/sandboxed installs
+work-composer-cache/

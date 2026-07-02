@@ -1,4 +1,4 @@
-Laravel 12 Microservice API Template
+Laravel 13 Microservice API Template
 
 Overview
 - Purpose: Practical starter for secure, observable, message‑driven APIs.
@@ -7,6 +7,101 @@ Overview
 Quick Start
 - Requirements: PHP 8.3+, Composer, ext-sockets (for RabbitMQ), Docker optional.
 - Install: `composer install` then copy `.env` from `.env.example` and fill values.
+- Local Azure-like infrastructure: run `dotnet run --project aspire/LaravelMicro.AppHost/LaravelMicro.AppHost.csproj` to start the Laravel container plus PostgreSQL, Redis, Azurite, Azure Service Bus emulator, SQL Edge, OpenTelemetry Collector, and the Aspire dashboard.
+- Azure environments: dev, QA, UAT, and production should use managed Azure services. See `docs/azure-local-aspire.md`.
+
+Linux: Install .NET Aspire And Docker
+
+The Aspire AppHost in this repository targets `net10.0`, so Linux machines need the .NET 10 SDK and Docker before running the local distributed environment.
+
+Ubuntu / Debian prerequisites:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg lsb-release
+```
+
+Install the Microsoft package feed. Use the command that matches your distribution.
+
+Ubuntu 24.04:
+
+```bash
+wget https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+sudo dpkg -i packages-microsoft-prod.deb
+rm packages-microsoft-prod.deb
+sudo apt-get update
+```
+
+Ubuntu 22.04:
+
+```bash
+wget https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+sudo dpkg -i packages-microsoft-prod.deb
+rm packages-microsoft-prod.deb
+sudo apt-get update
+```
+
+Debian 12:
+
+```bash
+wget https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+sudo dpkg -i packages-microsoft-prod.deb
+rm packages-microsoft-prod.deb
+sudo apt-get update
+```
+
+Install .NET 10 SDK:
+
+```bash
+sudo apt-get install -y dotnet-sdk-10.0
+dotnet --version
+```
+
+Install Docker Engine:
+
+```bash
+sudo apt-get install -y docker.io docker-compose-plugin
+sudo usermod -aG docker "$USER"
+newgrp docker
+docker version
+docker compose version
+```
+
+If your Linux distribution does not provide `docker.io` or `docker-compose-plugin`, install Docker Engine from Docker's official repository for your distribution.
+
+Run the Aspire AppHost:
+
+```bash
+dotnet restore aspire/LaravelMicro.AppHost/LaravelMicro.AppHost.csproj
+dotnet run --project aspire/LaravelMicro.AppHost/LaravelMicro.AppHost.csproj
+```
+
+What Aspire starts locally:
+
+- Laravel API container
+- PostgreSQL
+- Redis
+- Azurite for Blob Storage emulation
+- Azure Service Bus emulator
+- Azure SQL Edge for the Service Bus emulator
+- OpenTelemetry Collector
+- Aspire dashboard
+
+Useful checks:
+
+```bash
+docker ps
+dotnet build aspire/LaravelMicro.AppHost/LaravelMicro.AppHost.csproj --no-restore
+docker build --target test -t laravel-micro:test .
+docker run --rm -e APP_ENV=testing -e APP_KEY=base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= -e DB_CONNECTION=sqlite -e DB_DATABASE=:memory: -e QUEUE_CONNECTION=sync -e OTEL_ENABLED=false laravel-micro:test
+```
+
+Linux notes:
+
+- The AppHost uses relative bind mounts for `docker/servicebus/config.json` and `docker/otelcol/config.yaml`; run commands from the repository root.
+- Docker must be running before `dotnet run`.
+- First run can take several minutes because Docker pulls the Azure emulator and database images.
+- The Laravel runtime image is Linux-based already: `php:8.3-*-alpine`.
 
 > [!WARNING]
 > `.env` holds your real configuration and secrets for your environment (dev/staging/prod). The app reads these at boot and via `config/micro.php`.

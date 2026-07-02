@@ -2,40 +2,33 @@
 
 namespace App\Messaging;
 
-use PhpAmqpLib\Connection\AMQPStreamConnection;
-use PhpAmqpLib\Message\AMQPMessage;
+use Illuminate\Support\Facades\Queue;
+use RuntimeException;
 
 class Publisher
 {
-    public function __construct(private readonly array $config = []) {}
-
     public function publish(string $routingKey, array $message, array $headers = []): void
     {
-        $conf = $this->config + config('queue.connections.rabbitmq');
-        $host = $conf['hosts'][0] ?? [];
-        $exchange = $conf['options']['exchange'] ?? 'app.exchange';
+        $connection = config('queue.default');
 
-        $connection = new AMQPStreamConnection(
-            $host['host'] ?? 'rabbitmq',
-            $host['port'] ?? 5672,
-            $host['user'] ?? 'guest',
-            $host['password'] ?? 'guest',
-            $host['vhost'] ?? '/'
-        );
+        if ($connection !== 'azure-servicebus') {
+            throw new RuntimeException("Publishing is implemented for azure-servicebus; current queue connection is [$connection].");
+        }
 
-        $channel = $connection->channel();
-        $channel->exchange_declare($exchange, $conf['options']['exchange_type'] ?? 'topic', false, true, false);
-
-        $props = [
-            'content_type' => 'application/json',
-            'delivery_mode' => AMQPMessage::DELIVERY_MODE_PERSISTENT,
-            'application_headers' => $headers,
-        ];
-
-        $msg = new AMQPMessage(json_encode($message), $props);
-        $channel->basic_publish($msg, $exchange, $routingKey);
-        $channel->close();
-        $connection->close();
+        Queue::connection($connection)->pushRaw(json_encode([
+            'uuid' => $message['id'] ?? (string) \Illuminate\Support\Str::uuid(),
+            'displayName' => $routingKey,
+            'job' => 'App\\Jobs\\ExampleEventConsumer@handle',
+            'maxTries' => null,
+            'maxExceptions' => null,
+            'failOnTimeout' => false,
+            'backoff' => null,
+            'timeout' => null,
+            'retryUntil' => null,
+            'data' => [
+                'commandName' => \App\Jobs\ExampleEventConsumer::class,
+                'command' => serialize(new \App\Jobs\ExampleEventConsumer($message, $headers)),
+            ],
+        ]), null, ['headers' => array_merge($headers, ['Routing-Key' => $routingKey])]);
     }
 }
-

@@ -60,6 +60,17 @@ return [
             'report' => false,
         ],
 
+        'azure' => [
+            'driver' => 'azure',
+            'connection_string' => env('AZURE_STORAGE_CONNECTION_STRING'),
+            'account' => env('AZURE_STORAGE_ACCOUNT'),
+            'key' => env('AZURE_STORAGE_KEY'),
+            'container' => env('AZURE_STORAGE_CONTAINER', 'app'),
+            'url' => env('AZURE_STORAGE_URL'),
+            'throw' => true,
+            'report' => true,
+        ],
+
     ],
 
     /*

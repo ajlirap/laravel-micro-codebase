@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(\App\Http\Middleware\CorrelationId::class);
+        $middleware->append(\App\Http\Middleware\OpenTelemetryRequestMiddleware::class);
         // Log API requests/responses (see LOG_HTTP_* env toggles)
         $middleware->append(\App\Http\Middleware\RequestResponseLogger::class);
         $middleware->alias(['auth.jwt' => \App\Http\Middleware\JwtAuthenticate::class]);

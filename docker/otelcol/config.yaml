@@ -1,0 +1,33 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+
+exporters:
+  debug:
+    verbosity: basic
+  azuremonitor:
+    maxbatchsize: 1024
+    maxbatchinterval: 10s
+    spaneventsenabled: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, azuremonitor]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, azuremonitor]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, azuremonitor]
